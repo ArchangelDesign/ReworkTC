@@ -1,50 +1,79 @@
 # ReworkTC - PID Temperature Controller
 
-An ESP32-based PID temperature controller designed for soldering rework stations, reflow ovens, and other precision temperature control applications. Features thermocouple temperature sensing, OLED display, and Bluetooth/Serial control interface.
+A versatile PID temperature controller designed for soldering rework stations, reflow ovens, and other precision temperature control applications. Supports ESP32 (with display and Bluetooth) and Arduino Nano (minimal configuration). Features thermocouple temperature sensing, optional OLED display, and Bluetooth/Serial control interface.
 
 ## Features
 
 - **PID Temperature Control**: Precise temperature regulation with tunable PID parameters (Kp, Ki, Kd)
 - **MAX6675 Thermocouple Interface**: Accurate temperature readings up to 1024°C
-- **OLED Display**: Real-time temperature, power percentage, and status display
+- **Multiple Board Support**: ESP32 (full features) or Arduino Nano (minimal)
+- **OLED Display**: Real-time temperature, power percentage, and status display (ESP32)
 - **Dual Control Interface**: Bluetooth and Serial command support
 - **Time-Proportional SSR Control**: Smooth 2-second cycle PWM for solid-state relays
-- **Persistent Settings**: PID parameters and setpoint stored in flash memory
+- **Persistent Settings**: PID parameters and setpoint stored in flash memory (ESP32)
 - **Open Source**: MIT licensed for easy modification and integration
 
 ## Hardware Requirements
 
+### Supported Boards
+
+#### ESP32 (Full Features)
+- **Board**: Heltec WiFi Kit 32 or compatible ESP32
+- **Features**: Display, Bluetooth, persistent settings, all commands
+- **Environment**: `heltec_wifi_kit_32`
+
+#### Arduino Nano (Minimal)
+- **Board**: Arduino Nano (ATmega328P)
+- **Features**: Serial control only, no display, no Bluetooth
+- **Environment**: `nanoatmega328`
+- **Note**: Lower memory footprint, ideal for embedded applications
+
 ### Core Components
-- **ESP32 Development Board** (Heltec WiFi Kit 32 or compatible)
+- **ESP32 Development Board** or **Arduino Nano**
 - **MAX6675 Thermocouple Interface Module**
 - **K-Type Thermocouple**
 - **Solid State Relay (SSR)** for heater control
-- **SSD1306 OLED Display** (128x64, I2C)
+- **SSD1306 OLED Display** (128x64, I2C) - ESP32 only
 
 ### Connections
 
-#### MAX6675 Thermocouple Module
+#### ESP32 Configuration
+
+##### MAX6675 Thermocouple Module
 - `CLK` → GPIO 18
 - `CS` → GPIO 5
 - `DO` → GPIO 19
 - `VCC` → 3.3V
 - `GND` → GND
 
-#### SSR Control
+##### SSR Control
 - `SSR Signal` → GPIO 25
 - `Status LED` → GPIO 22
 
-#### OLED Display (I2C)
+##### OLED Display (I2C)
 - `SDA` → GPIO 4 (default I2C)
 - `SCL` → GPIO 15 (default I2C)
 - `RST` → GPIO 16
 - `VCC` → 3.3V
 - `GND` → GND
 
+#### Arduino Nano Configuration
+
+##### MAX6675 Thermocouple Module
+- `CLK` → Digital Pin 7
+- `CS` → Digital Pin 8
+- `DO` → Digital Pin 6
+- `VCC` → 5V
+- `GND` → GND
+
+##### SSR Control
+- `SSR Signal` → Digital Pin 3 (PWM)
+- `Status LED` → Digital Pin 13 (Built-in LED)
+
 ## Software Requirements
 
 - [PlatformIO](https://platformio.org/) (recommended) or Arduino IDE
-- Required Libraries:
+- Required Libraries (ESP32 only):
   - Adafruit GFX Library
   - Adafruit SSD1306
 
@@ -58,18 +87,28 @@ An ESP32-based PID temperature controller designed for soldering rework stations
    cd ReworkTc
    ```
 
-2. **Open in PlatformIO**
+2. **Build for ESP32**
    ```bash
-   pio run
+   pio run -e heltec_wifi_kit_32
    ```
 
-3. **Upload to ESP32**
+3. **Build for Arduino Nano**
    ```bash
-   pio run --target upload --upload-port COMX
+   pio run -e nanoatmega328
    ```
-   Replace `COMX` with your ESP32's serial port (e.g., `COM7` on Windows, `/dev/ttyUSB0` on Linux)
 
-4. **Monitor Serial Output**
+4. **Upload to ESP32**
+   ```bash
+   pio run -e heltec_wifi_kit_32 --target upload --upload-port COMX
+   ```
+
+5. **Upload to Arduino Nano**
+   ```bash
+   pio run -e nanoatmega328 --target upload --upload-port COMX
+   ```
+   Replace `COMX` with your board's serial port (e.g., `COM7` on Windows, `/dev/ttyUSB0` on Linux)
+
+6. **Monitor Serial Output**
    ```bash
    pio device monitor
    ```
