@@ -25,6 +25,20 @@
 
 #pragma once
 
+#include <Arduino.h>
+
+#if DISABLE_DISPLAY==1
+// Display disabled - provide stub functions
+void display_init() {
+  Serial.println("Display disabled by build flag");
+}
+
+void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1) {
+  // No-op when display disabled
+}
+
+#else
+// Display enabled - include libraries and implement full functionality
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
@@ -40,10 +54,6 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void display_init() {
-  #if DISABLE_DISPLAY==1
-  Serial.println("Display disabled by build flag");
-  return;
-  #endif
   // Power on the OLED display (Heltec boards require this)
   pinMode(VEXT_CTRL, OUTPUT);
   digitalWrite(VEXT_CTRL, LOW); // LOW = power ON for Heltec boards
@@ -61,12 +71,11 @@ void display_init() {
 }
 
 void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1) {
-  #if DISABLE_DISPLAY==1
-  return;
-  #endif
   display.setTextSize(size);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(x, y);
   display.println(text);
   display.display();
 }
+
+#endif  // DISABLE_DISPLAY

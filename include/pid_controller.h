@@ -26,7 +26,13 @@
 #pragma once
 
 #include <Arduino.h>
+
+// Use Preferences on ESP32, EEPROM on AVR
+#ifdef ESP32
 #include <Preferences.h>
+#else
+#include <EEPROM.h>
+#endif
 
 // Pin definitions - can be overridden via build flags
 #ifndef PID_OUTPUT_PIN
@@ -43,7 +49,17 @@
 
 extern int16_t current_temperature_celsius;
 
+#ifdef ESP32
 Preferences pid_prefs;
+#else
+// EEPROM addresses for AVR
+#define EEPROM_KP_ADDR 0
+#define EEPROM_KI_ADDR 4
+#define EEPROM_KD_ADDR 8
+#define EEPROM_SETPOINT_ADDR 12
+#define EEPROM_MAGIC_ADDR 14
+#define EEPROM_MAGIC_VALUE 0xAB  // Magic byte to detect if EEPROM is initialized
+#endif
 
 int16_t pid_setpoint = 37;
 uint8_t pid_holdback = 5;
@@ -65,21 +81,46 @@ unsigned long ssr_cycle_start = 0;
 bool ssr_state = false;
 
 void pid_save_settings() {
+#ifdef ESP32
   pid_prefs.begin("pid", false);
   pid_prefs.putFloat("kp", pid_kp);
   pid_prefs.putFloat("ki", pid_ki);
   pid_prefs.putFloat("kd", pid_kd);
   pid_prefs.putShort("setpoint", pid_setpoint);
   pid_prefs.end();
+#else
+  // AVR EEPROM implementation
+  EEPROM.put(EEPROM_KP_ADDR, pid_kp);
+  EEPROM.put(EEPROM_KI_ADDR, pid_ki);
+  EEPROM.put(EEPROM_KD_ADDR, pid_kd);
+  EEPROM.put(EEPROM_SETPOINT_ADDR, pid_setpoint);
+  EEPROM.write(EEPROM_MAGIC_ADDR, EEPROM_MAGIC_VALUE);
+#endif
 }
 
 void pid_load_settings() {
+#ifdef ESP32
   pid_prefs.begin("pid", true); // read-only mode
   pid_kp = pid_prefs.getFloat("kp", 1.0);
   pid_ki = pid_prefs.getFloat("ki", 2.0);
   pid_kd = pid_prefs.getFloat("kd", 1.0);
   pid_setpoint = pid_prefs.getShort("setpoint", 37);
   pid_prefs.end();
+#else
+  // AVR EEPROM implementation - check if initialized
+  if (EEPROM.read(EEPROM_MAGIC_ADDR) == EEPROM_MAGIC_VALUE) {
+    EEPROM.get(EEPROM_KP_ADDR, pid_kp);
+    EEPROM.get(EEPROM_KI_ADDR, pid_ki);
+    EEPROM.get(EEPROM_KD_ADDR, pid_kd);
+    EEPROM.get(EEPROM_SETPOINT_ADDR, pid_setpoint);
+  } else {
+    // EEPROM not initialized, use defaults
+    pid_kp = 1.0;
+    pid_ki = 2.0;
+    pid_kd = 1.0;
+    pid_setpoint = 37;
+  }
+#endif
 }
 
 void pid_init() {

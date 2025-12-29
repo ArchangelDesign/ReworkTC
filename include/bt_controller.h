@@ -26,7 +26,10 @@
 #pragma once
 
 #include <Arduino.h>
+
+#if BT_ENABLED==1
 #include <BluetoothSerial.h>
+#endif
 
 extern int16_t pid_setpoint;
 extern uint8_t pid_holdback;
@@ -39,6 +42,7 @@ extern int16_t current_temperature_celsius;
 
 extern void pid_save_settings();
 
+#if BT_ENABLED==1
 BluetoothSerial* SerialBT = nullptr;
 
 void bt_init() {
@@ -51,6 +55,11 @@ void bt_init() {
     Serial.println("Bluetooth init failed!");
   }
 }
+#else
+void bt_init() {
+  Serial.println("Bluetooth disabled by build flag");
+}
+#endif
 
 void bt_process_commands() {
   // Check if there's a command from either Bluetooth or Serial
@@ -58,11 +67,14 @@ void bt_process_commands() {
   Stream* output = nullptr;
   bool from_bt = false;
   
+#if BT_ENABLED==1
   if (SerialBT != nullptr && SerialBT->available()) {
     input = SerialBT;
     output = SerialBT;
     from_bt = true;
-  } else if (Serial.available()) {
+  } else
+#endif
+  if (Serial.available()) {
     input = &Serial;
     output = &Serial;
     from_bt = false;
@@ -75,18 +87,22 @@ void bt_process_commands() {
   String command = input->readStringUntil('\n');
   command.trim();
   
-  const char* source = from_bt ? "BT" : "Serial";
-  
   if (command.startsWith("SET:")) {
     // Command: SET:150 (set setpoint to 150°C)
     int value = command.substring(4).toInt();
     if (value >= 0 && value <= 400) {
       pid_setpoint = value;
       pid_save_settings();
-      output->printf("OK Setpoint=%d (saved)\n", pid_setpoint);
+      output->print("OK Setpoint=");
+      output->print(pid_setpoint);
+      output->println(" (saved)");
+#if BT_ENABLED==1
       if (from_bt) {
-        Serial.printf("BT: Setpoint set to %d°C\n", pid_setpoint);
+        Serial.print("BT: Setpoint set to ");
+        Serial.print(pid_setpoint);
+        Serial.println("°C");
       }
+#endif
     } else {
       output->println("ERROR Invalid setpoint range (0-400)");
     }
@@ -95,52 +111,77 @@ void bt_process_commands() {
     // Command: ON (enable PID)
     pid_enabled = true;
     output->println("OK PID=ON");
+#if BT_ENABLED==1
     if (from_bt) {
       Serial.println("BT: PID enabled");
     }
+#endif
   }
   else if (command == "OFF") {
     // Command: OFF (disable PID)
     pid_enabled = false;
     output->println("OK PID=OFF");
+#if BT_ENABLED==1
     if (from_bt) {
       Serial.println("BT: PID disabled");
     }
+#endif
   }
   else if (command == "STATUS") {
     // Command: STATUS (request current status)
-    output->printf("SETPOINT:%d ENABLED:%d TEMP:%.1f POWER:%d\n", 
-                    pid_setpoint, pid_enabled, (float)current_temperature_celsius, pid_current_power);
+    output->print("SETPOINT:");
+    output->print(pid_setpoint);
+    output->print(" ENABLED:");
+    output->print(pid_enabled);
+    output->print(" TEMP:");
+    output->print((float)current_temperature_celsius);
+    output->print(" POWER:");
+    output->println(pid_current_power);
   }
   else if (command.startsWith("KP:")) {
     // Command: KP:10.0 (set Kp parameter)
     float value = command.substring(3).toFloat();
     pid_kp = value;
     pid_save_settings();
-    output->printf("OK Kp=%.2f (saved)\n", pid_kp);
+    output->print("OK Kp=");
+    output->print(pid_kp, 2);
+    output->println(" (saved)");
+#if BT_ENABLED==1
     if (from_bt) {
-      Serial.printf("BT: Kp set to %.2f\n", pid_kp);
+      Serial.print("BT: Kp set to ");
+      Serial.println(pid_kp, 2);
     }
+#endif
   }
   else if (command.startsWith("KI:")) {
     // Command: KI:61.0 (set Ki parameter)
     float value = command.substring(3).toFloat();
     pid_ki = value;
     pid_save_settings();
-    output->printf("OK Ki=%.2f (saved)\n", pid_ki);
+    output->print("OK Ki=");
+    output->print(pid_ki, 2);
+    output->println(" (saved)");
+#if BT_ENABLED==1
     if (from_bt) {
-      Serial.printf("BT: Ki set to %.2f\n", pid_ki);
+      Serial.print("BT: Ki set to ");
+      Serial.println(pid_ki, 2);
     }
+#endif
   }
   else if (command.startsWith("KD:")) {
     // Command: KD:9.0 (set Kd parameter)
     float value = command.substring(3).toFloat();
     pid_kd = value;
     pid_save_settings();
-    output->printf("OK Kd=%.2f (saved)\n", pid_kd);
+    output->print("OK Kd=");
+    output->print(pid_kd, 2);
+    output->println(" (saved)");
+#if BT_ENABLED==1
     if (from_bt) {
-      Serial.printf("BT: Kd set to %.2f\n", pid_kd);
+      Serial.print("BT: Kd set to ");
+      Serial.println(pid_kd, 2);
     }
+#endif
   }
   else if (command == "HELP") {
     output->println("Commands:");
@@ -160,9 +201,18 @@ void bt_process_commands() {
 }
 
 void bt_send_status(float temperature, uint8_t power, bool heater_on) {
+#if BT_ENABLED==1
   if (SerialBT != nullptr) {
-    SerialBT->printf("TEMP:%.1f POWER:%d HEAT:%s SP:%d EN:%d\n", 
-                  temperature, power, heater_on ? "ON" : "OFF", 
-                  pid_setpoint, pid_enabled);
+    SerialBT->print("TEMP:");
+    SerialBT->print(temperature, 1);
+    SerialBT->print(" POWER:");
+    SerialBT->print(power);
+    SerialBT->print(" HEAT:");
+    SerialBT->print(heater_on ? "ON" : "OFF");
+    SerialBT->print(" SP:");
+    SerialBT->print(pid_setpoint);
+    SerialBT->print(" EN:");
+    SerialBT->println(pid_enabled);
   }
+#endif
 }

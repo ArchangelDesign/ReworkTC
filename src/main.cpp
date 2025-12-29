@@ -103,6 +103,22 @@ void loop() {
     
     display.display();
   }
+  #else
+  // No display - output to serial only
+  if (isnan(temperature)) {
+    Serial.println("Thermocouple error: Open circuit");
+  } else {
+    char tempStr[20];
+    snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
+    const char* status = (pid_enabled && pid_current_power > 0) ? "HEAT: ON" : "HEAT: OFF";
+    
+    Serial.print("Temp: ");
+    Serial.print(tempStr);
+    Serial.print(" Power: ");
+    Serial.print(pid_current_power);
+    Serial.print("% Status: ");
+    Serial.println(status);
+  }
   #endif
   
   bt_process_commands();
