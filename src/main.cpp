@@ -33,16 +33,41 @@
 
 void setup() {
   // put your setup code here, to run once:
+#ifdef __AVR__
+  // Arduino Nano/Uno - use lower baud rate for stability
+  // CH340 chip on Nano doesn't support Serial readiness check properly
+  
+  // Pre-configure UART before enabling to prevent CH340 glitches
+  UCSR0A = 0;
+  UCSR0B = 0;
+  UCSR0C = 0;
+  
+  Serial.begin(9600);
+  delay(500);  // Give CH340 time to stabilize
+  Serial.flush();  // Clear any garbage in the buffer
+  
+  // Keep sending data to keep CH340 "alive" and responsive
+  Serial.println();
+  Serial.flush();
+  delay(100);
+#else
+  // ESP32 - can handle higher baud rate
   Serial.begin(115200);
   delay(100);
+#endif
   
+  Serial.println("ReworkTC Starting...");
+  
+  Serial.println("Init display...");
   display_init();
   display_print_text(0, 0, "Starting...", 2);
   delay(300);
   
+  Serial.println("Init thermocouple...");
   thermocouple_init();
   delay(100);
   
+  Serial.println("Init PID...");
   pid_init();
   delay(100);
   
@@ -61,17 +86,25 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  static unsigned long lastErrorPrint = 0;
+  static bool lastErrorState = false;
+  
   float temperature = thermocouple_read_temperature();
+  bool hasError = isnan(temperature);
   
   #if DISABLE_DISPLAY!=1
   display.clearDisplay();
-  if (isnan(temperature)) {
+  if (hasError) {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
     display.println("Error: TC Open");
     display.display();
-    Serial.println("Thermocouple error: Open circuit");
+    // Only print error once or every 5 seconds to avoid flooding serial buffer
+    if (!lastErrorState || (millis() - lastErrorPrint > 5000)) {
+      Serial.println("Thermocouple error: Open circuit");
+      lastErrorPrint = millis();
+    }
   } else {
     // Display temperature (large)
     char tempStr[20];
@@ -105,23 +138,49 @@ void loop() {
   }
   #else
   // No display - output to serial only
-  if (isnan(temperature)) {
-    Serial.println("Thermocouple error: Open circuit");
+  if (hasError) {
+    // Only print error once or every 5 seconds to avoid flooding serial buffer
+    if (!lastErrorState || (millis() - lastErrorPrint > 5000)) {
+      Serial.println("Thermocouple error: Open circuit");
+      lastErrorPrint = millis();
+    }
   } else {
     char tempStr[20];
     snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
     const char* status = (pid_enabled && pid_current_power > 0) ? "HEAT: ON" : "HEAT: OFF";
     
-    Serial.print("Temp: ");
-    Serial.print(tempStr);
-    Serial.print(" Power: ");
-    Serial.print(pid_current_power);
-    Serial.print("% Status: ");
-    Serial.println(status);
+    // Serial.print("Temp: ");
+    // Serial.print(tempStr);
+    // Serial.print(" Power: ");
+    // Serial.print(pid_current_power);
+    // Serial.print("% Status: ");
+    // Serial.println(status);
   }
   #endif
   
+  lastErrorState = hasError;
   bt_process_commands();
+  
+  // Periodic serial keepalive for CH340 stability
+  #ifdef __AVR__
+  static unsigned long lastKeepalive = 0;
+  if (millis() - lastKeepalive > 1000) {
+    // Send a single byte periodically to keep CH340 responsive
+    Serial.write('\0');  // Null byte won't affect output
+    Serial.flush();
+    lastKeepalive = millis();
+  }
+  #endif
+  
+  // Clear any excess data in serial buffer (prevent overflow)
+  #ifdef __AVR__
+  if (Serial.available() > 64) {
+    while (Serial.available() && Serial.read() != '\n') {
+      ; // Clear buffer until newline
+    }
+  }
+  #endif
+  
   pid_compute();  // Compute PID output
   pid_update_ssr();  // Update SSR state based on time-proportional control
   delay(250);  // Give MAX6675 time to convert and prevent display flicker

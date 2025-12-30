@@ -49,6 +49,9 @@ void thermocouple_init() {
   
   digitalWrite(MAX6675_CS, HIGH);
   digitalWrite(MAX6675_CLK, LOW);
+  
+  // Give MAX6675 time to stabilize
+  delay(100);
 }
 
 float thermocouple_read_temperature() {
