@@ -47,6 +47,10 @@
 #define SSR_PERIOD_MS 2000  // 2 second period for SSR time-proportional control
 #endif
 
+#ifndef PID_MAX_OUTPUT
+#define PID_MAX_OUTPUT 1800  // Maximum PID output value for scaling
+#endif
+
 extern int16_t current_temperature_celsius;
 
 #ifdef ESP32
@@ -209,7 +213,7 @@ void pid_compute() {
   // Max I term: limited by anti-windup to 100/Ki ≈ 1.64 at 61 Ki, so ~100
   // Max D term: reasonable max would be ~100 for aggressive tuning
   // Conservative max output estimate: ~500 for normal operation
-  float max_output = 200.0;
+  float max_output = PID_MAX_OUTPUT;
   float power_percentage = (output / max_output) * 100.0;
   
   // Clamp to 0-100%
