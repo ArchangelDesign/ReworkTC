@@ -5,12 +5,14 @@ A versatile PID temperature controller designed for soldering rework stations, r
 ## Features
 
 - **PID Temperature Control**: Precise temperature regulation with tunable PID parameters (Kp, Ki, Kd)
+- **Auto-Tune**: Automatic PID parameter optimization using relay-feedback method
 - **MAX6675 Thermocouple Interface**: Accurate temperature readings up to 1024°C
-- **Multiple Board Support**: ESP32 (full features) or Arduino Nano (minimal)
+- **Multiple Board Support**: ESP32 (full features), Arduino Uno, or Arduino Nano
 - **OLED Display**: Real-time temperature, power percentage, and status display (ESP32)
 - **Dual Control Interface**: Bluetooth and Serial command support
 - **Time-Proportional SSR Control**: Smooth 2-second cycle PWM for solid-state relays
-- **Persistent Settings**: PID parameters and setpoint stored in flash memory (ESP32)
+- **Persistent Settings**: PID parameters and setpoint stored in flash/EEPROM
+- **Improved PID Algorithm**: Fast 250ms updates with derivative filtering and smart anti-windup
 - **Open Source**: MIT licensed for easy modification and integration
 
 ## Hardware Requirements
@@ -22,12 +24,19 @@ A versatile PID temperature controller designed for soldering rework stations, r
 - **Features**: Display, Bluetooth, persistent settings, all commands
 - **Environment**: `heltec_wifi_kit_32`
 
-#### Arduino Nano (Minimal)
-- **Board**: Arduino Nano (ATmega328P)
-- **Features**: Serial control only, no display, no Bluetooth
-- **Environment**: `nanoatmega328`
-- **Note**: Lower memory footprint, ideal for embedded applications
+#### Arduino Uno (Recommended for Production)
+- **Board**: Arduino Uno (ATmega328P)
+- **Features**: Serial control, persistent EEPROM settings, reliable USB (ATmega16U2/FTDI)
+- **Environment**: `uno`
+- **Note**: More reliable serial communication than Nano clones with CH340
 
+#### Arduino Nano (Budget Option)
+- **Board**: Arduino Nano (AT, **Arduino Uno**, or **Arduino Nano**
+- **MAX6675 Thermocouple Interface Module**
+- **K-Type Thermocouple**
+- **Solid State Relay (SSR)** for heater control
+- **SSD1306 OLED Display** (128x64, I2C) - ESP32 only
+- **Optional**: External FT232 USB-Serial module for reliable Nano serial communication
 ### Core Components
 - **ESP32 Development Board** or **Arduino Nano**
 - **MAX6675 Thermocouple Interface Module**
@@ -50,18 +59,20 @@ A versatile PID temperature controller designed for soldering rework stations, r
 - `SSR Signal` → GPIO 25
 - `Status LED` → GPIO 22
 
-##### OLED Display (I2C)
-- `SDA` → GPIO 4 (default I2C)
-- `SCL` → GPIO 15 (default I2C)
-- `RST` → GPIO 16
-- `VCC` → 3.3V
-- `GND` → GND
-
-#### Arduino Nano Configuration
+##### OLED Displa/Uno Configuration
 
 ##### MAX6675 Thermocouple Module
 - `CLK` → Digital Pin 7
 - `CS` → Digital Pin 8
+- `DO` → Digital Pin 6
+- `VCC` → 5V
+- `GND` → GND
+
+##### SSR Control
+- `SSR Signal` → Digital Pin 3 (PWM)
+- `Status LED` → Digital Pin 13 (Built-in LED)
+
+**Note**: For Nano with CH340 USB chip issues, connect external FT232 module to TX/RX pins for reliable serial communication.
 - `DO` → Digital Pin 6
 - `VCC` → 5V
 - `GND` → GND
@@ -89,18 +100,33 @@ A versatile PID temperature controller designed for soldering rework stations, r
 
 2. **Build for ESP32**
    ```bash
-   pio run -e heltec_wifi_kit_32
+   pio run -e heltec_wiUno**
+   ```bash
+   pio run -e uno
    ```
 
-3. **Build for Arduino Nano**
+4. **Build for Arduino Nano**
    ```bash
    pio run -e nanoatmega328
    ```
 
-4. **Upload to ESP32**
+5  pio run -e nESP32**
    ```bash
    pio run -e heltec_wifi_kit_32 --target upload --upload-port COMX
    ```
+
+6. **Upload to Arduino Uno**
+   ```bash
+   pio run -e uno --target upload --upload-port COMX
+   ```
+
+7. **Upload to Arduino Nano**
+   ```bash
+   pio run -e nanoatmega328 --target upload --upload-port COMX
+   ```
+   Replace `COMX` with your board's serial port (e.g., `COM7` on Windows, `/dev/ttyUSB0` on Linux)
+
+8  ```
 
 5. **Upload to Arduino Nano**
    ```bash
@@ -133,24 +159,14 @@ build_flags =
     -DPID_OUTPUT_PIN=25         ; SSR control pin
     -DHEATER_LED_PIN=22         ; Status LED pin
     -DSSR_PERIOD_MS=2000        ; SSR PWM cycle time (ms)
-    -DMAX6675_CLK=18            ; MAX6675 clock pin
-    -DMAX6675_CS=5              ; MAX6675 chip select pin
-    -DMAX6675_DO=19             ; MAX6675 data output pin
-```
+    -DMAX6675_CLK=18            ; MAX6675 clock pin(ESP32) and Serial. 
 
-### Upload Port
+**Serial Settings:**
+- ESP32: 115200 baud
+- Arduino Uno/Nano: 9600 baud
+- Format: 8-N-1 (8 data bits, no parity, 1 stop bit)
 
-Update the upload port in `platformio.ini`:
-```ini
-upload_port = COM7              ; Windows
-upload_port = /dev/ttyUSB0      ; Linux
-```
-
-## Usage
-
-### Command Interface
-
-The controller accepts commands via both Bluetooth and Serial (115200 baud). Commands are case-sensitive and end with newline (`\n`).
+Commands are case-sensitive and end with newline (`\n`).
 
 #### Available Commands
 
@@ -161,16 +177,88 @@ The controller accepts commands via both Bluetooth and Serial (115200 baud). Com
 | `OFF` | Disable PID controller | `OFF` |
 | `STATUS` | Get current status | `STATUS` |
 | `KP:<value>` | Set proportional gain | `KP:10.0` |
-| `KI:<value>` | Set integral gain | `KI:61.0` |
-| `KD:<value>` | Set derivative gain | `KD:9.0` |
-| `HELP` | Display command list | `HELP` |
+| `KI:<value>` | Set integral gain | `KI:0.5` |
+| `KD20
+OK Setpoint=120 (saved)
 
-#### Command Examples
+TUNE
+OK Auto-tune started. Wait 5-10 minutes...
+WARNING: Monitor temperature! Stop if unstable.
 
-**Via Serial Monitor:**
+[Wait for auto-tune to complete...]
+
+Auto-tune complete! Kp=12.34 Ki=0.67 Kd=45.21
+
+ON
+OK PID=ON
+
+STATUS
+SETPOINT:120 ENABLED:1 TEMP:119.8 POWER:28
 ```
-SET:180
-OK Setpoint=180 (saved)
+
+#### Automatic Tuning (Recommended)
+
+The controller includes an auto-tune feature that uses relay-feedback method with Ziegler-Nichols tuning:
+
+1. **Set target temperature**: `SET:120`
+2. **Start auto-tune**: `TUNE`
+3. **Wait 5-10 minutes** while the system oscillates
+4. **Parameters automatically calculated and saved**
+
+The auto-tune will:
+- Heat to setpoint then cycle on/off
+- Measure oscillation amplitude and period
+- Calculate optimal PID values
+- Save to EEPROM/flash automatically
+
+**⚠️ Monitor temperature during auto-tune!** Stop if unstable.
+
+#### Manual Tuning
+
+Default PID values work well for most systems:
+- Smart anti-windup protection for integral term
+- Power output clamped to 0-100%
+- Time-proportional control for SSR longevity
+- Thermocouple open-circuit detection
+- Derivative filtering reduces noise-induced instability
+- Auto-tune monitors oscillations to prevent runaway
+To manually adjust:
+
+1. Start with defaults: `KP:10.0`, `KI:0.5`, `KD:50.0`
+2. **If overshoots**: Reduce Kp or increase Kd
+3. **If slow response**: Increase Kp
+4. **If doesn't reach setpoint**: Increase Ki
+5. **If oscillates**: Reduce Kp and Ki, increase Kd
+
+Values are automatically saved to persistent storage.
+
+#### PID Algorithm Details
+
+- **Update rate**: 250ms (4 Hz) for responsive control
+- **Derivative filtering**: Low-pass filter reduces thermocouple noise
+- **Smart anti-windup**: Integral only accumulates when output is 5-95%
+- **Direct percentage output**: 0-100% power to heater|
+| `KD:<value>` | Set deri (ESP32)**
+- Verify `BT_ENABLED=1` in build flags
+- Check device appears as "ReworkTC"
+- Ensure no other device is connected
+
+**PID oscillates or overshoots**
+- Run auto-tune: `TUNE` command
+- If manual tuning: reduce Kp, increase Kd
+- Verify SSR cycle time is appropriate (default 2000ms)
+
+**Serial port won't open on Arduino Nano**
+- **CH340 USB chip issue**: Common with cheap Nano clones
+- **Solution 1**: Use Arduino Uno (has better ATmega16U2 USB chip)
+- **Solution 2**: Connect external FT232 module to TX/RX pins
+- **Solution 3**: Try different Nano board (CH340 quality varies)
+- Note: This is a hardware limitation, not a firmware issue
+
+**C# application can't connect to Nano**
+- CH340 driver incompatibility with .NET SerialPort class
+- Use Arduino Uno or external FT232 USB-Serial converter
+- PlatformIO monitor and Python work fine, but some .NET implementations fail
 
 ON
 OK PID=ON

@@ -71,14 +71,23 @@ bool pid_enabled = false;
 uint8_t pid_current_power = 0; // 0% - 100%
 
 // PID parameters
-float pid_kp = 1;
-float pid_ki = 1;
-float pid_kd = 1;
+float pid_kp = 10.0;
+float pid_ki = 0.5;
+float pid_kd = 50.0;
 
 // PID internal state
 float pid_integral = 0.0;
 float pid_last_error = 0.0;
+float pid_last_derivative = 0.0;  // For derivative filtering
 unsigned long pid_last_time = 0;
+
+// Auto-tune state
+bool pid_autotune_active = false;
+uint8_t pid_autotune_cycles = 0;
+float pid_autotune_peak_high = 0;
+float pid_autotune_peak_low = 999;
+unsigned long pid_autotune_peak_time = 0;
+float pid_autotune_output_step = 50.0; // % power for auto-tune
 
 // Software time-proportional control state
 unsigned long ssr_cycle_start = 0;
@@ -172,52 +181,114 @@ void pid_compute() {
     pid_current_power = 0;
     pid_integral = 0.0;
     pid_last_error = 0.0;
+    pid_autotune_active = false;
     return;
   }
   
   unsigned long now = millis();
   float dt = (now - pid_last_time) / 1000.0; // Convert to seconds
   
-  if (dt < 1.0) {
-    return; // Update at most every 1 second
+  if (dt < 0.25) {
+    return; // Update every 250ms for better response
   }
   
   pid_last_time = now;
   
+  // Auto-tune mode: simple relay-based tuning
+  if (pid_autotune_active) {
+    float temp = current_temperature_celsius;
+    
+    // Simple bang-bang control around setpoint
+    if (temp < pid_setpoint) {
+      pid_current_power = (uint8_t)pid_autotune_output_step;
+      
+      // Track low peak
+      if (temp < pid_autotune_peak_low) {
+        pid_autotune_peak_low = temp;
+      }
+      
+      // Detect crossing upward through setpoint
+      if (pid_last_error < 0 && (pid_setpoint - temp) > 0) {
+        unsigned long period = now - pid_autotune_peak_time;
+        if (period > 5000) { // Valid oscillation
+          pid_autotune_cycles++;
+          pid_autotune_peak_time = now;
+          
+          // After 3 cycles, calculate PID params
+          if (pid_autotune_cycles >= 3) {
+            float amplitude = (pid_autotune_peak_high - pid_autotune_peak_low) / 2.0;
+            float period_sec = period / 1000.0;
+            
+            // Ziegler-Nichols relay method
+            float ku = (4.0 * pid_autotune_output_step) / (3.14159 * amplitude);
+            float tu = period_sec;
+            
+            // PID tuning (conservative)
+            pid_kp = 0.6 * ku;
+            pid_ki = 1.2 * ku / tu;
+            pid_kd = 0.075 * ku * tu;
+            
+            // Save and finish
+            pid_save_settings();
+            pid_autotune_active = false;
+            pid_autotune_cycles = 0;
+            pid_integral = 0;
+            
+            Serial.print("Auto-tune complete! Kp=");
+            Serial.print(pid_kp, 2);
+            Serial.print(" Ki=");
+            Serial.print(pid_ki, 2);
+            Serial.print(" Kd=");
+            Serial.println(pid_kd, 2);
+          }
+        }
+      }
+    } else {
+      pid_current_power = 0;
+      
+      // Track high peak
+      if (temp > pid_autotune_peak_high) {
+        pid_autotune_peak_high = temp;
+      }
+    }
+    
+    pid_last_error = pid_setpoint - temp;
+    return;
+  }
+  
+  // Normal PID mode
   // Calculate error
   float error = pid_setpoint - current_temperature_celsius;
   
-  // PID calculations
-  pid_integral += error * dt;
+  // Proportional term
+  float p_term = pid_kp * error;
   
-  // Anti-windup: limit integral term
-  float max_integral = 100.0 / pid_ki;
-  if (pid_integral > max_integral) pid_integral = max_integral;
-  if (pid_integral < -max_integral) pid_integral = -max_integral;
+  // Integral term with anti-windup
+  // Only accumulate integral when not saturated
+  if (pid_current_power > 5 && pid_current_power < 95) {
+    pid_integral += error * dt;
+  }
   
+  // Limit integral to prevent windup
+  float max_integral = 50.0;  // Allow integral to contribute up to 50%
+  if (pid_integral > max_integral / pid_ki) pid_integral = max_integral / pid_ki;
+  if (pid_integral < -max_integral / pid_ki) pid_integral = -max_integral / pid_ki;
+  
+  float i_term = pid_ki * pid_integral;
+  
+  // Derivative term with filtering to reduce noise
   float derivative = (error - pid_last_error) / dt;
+  pid_last_derivative = 0.7 * pid_last_derivative + 0.3 * derivative; // Low-pass filter
+  float d_term = pid_kd * pid_last_derivative;
+  
   pid_last_error = error;
   
   // Calculate output
-  float output = (pid_kp * error) + (pid_ki * pid_integral) + (pid_kd * derivative);
-  
-  // Convert PID output to power percentage (0-100%)
-  // Clamp negative outputs to 0
-  if (output < 0) {
-    output = 0;
-  }
-  
-  // Scale to 0-100% based on maximum expected PID output
-  // Assuming max temp error of 400°C, with typical Kp=10, Ki=61, Kd=9:
-  // Max P term: 10 * 400 = 4000
-  // Max I term: limited by anti-windup to 100/Ki ≈ 1.64 at 61 Ki, so ~100
-  // Max D term: reasonable max would be ~100 for aggressive tuning
-  // Conservative max output estimate: ~500 for normal operation
-  float max_output = PID_MAX_OUTPUT;
-  float power_percentage = (output / max_output) * 100.0;
+  float output = p_term + i_term + d_term;
   
   // Clamp to 0-100%
-  if (power_percentage > 100.0) power_percentage = 100.0;
+  if (output < 0) output = 0;
+  if (output > 100) output = 100;
   
-  pid_current_power = (uint8_t)power_percentage;
+  pid_current_power = (uint8_t)output;
 }

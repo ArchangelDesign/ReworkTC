@@ -192,7 +192,25 @@ void bt_process_commands() {
     output->println("  KP:<value>   - Set Kp parameter [auto-saves]");
     output->println("  KI:<value>   - Set Ki parameter [auto-saves]");
     output->println("  KD:<value>   - Set Kd parameter [auto-saves]");
+    output->println("  TUNE         - Start PID auto-tune (requires setpoint)");
     output->println("  HELP         - Show this help");
+  }
+  else if (command == "TUNE") {
+    // Start auto-tune - will be handled in PID loop
+    if (pid_setpoint > 30 && pid_setpoint < 400) {
+      extern bool pid_autotune_active;
+      pid_autotune_active = true;
+      pid_enabled = true;
+      output->println("OK Auto-tune started. Wait 5-10 minutes...");
+      output->println("WARNING: Monitor temperature! Stop if unstable.");
+#if BT_ENABLED==1
+      if (from_bt) {
+        Serial.println("BT: Auto-tune started");
+      }
+#endif
+    } else {
+      output->println("ERROR Set valid setpoint first (30-400°C)");
+    }
   }
   else {
     output->println("ERROR Unknown command. Send HELP for commands.");
