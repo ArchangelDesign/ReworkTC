@@ -48,7 +48,7 @@
 #endif
 
 #ifndef PID_MAX_OUTPUT
-#define PID_MAX_OUTPUT 1800  // Maximum PID output value for scaling
+#define PID_MAX_OUTPUT 180  // Maximum PID output value for scaling
 #endif
 
 extern int16_t current_temperature_celsius;
