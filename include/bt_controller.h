@@ -39,6 +39,10 @@ extern float pid_kp;
 extern float pid_ki;
 extern float pid_kd;
 extern int16_t current_temperature_celsius;
+extern bool pid_autotune_active;
+extern float pid_kp;
+extern float pid_ki;
+extern float pid_kd;
 
 extern void pid_save_settings();
 
@@ -136,7 +140,15 @@ void bt_process_commands() {
     output->print(" TEMP:");
     output->print((float)current_temperature_celsius);
     output->print(" POWER:");
-    output->println(pid_current_power);
+    output->print(pid_current_power);
+    output->print(" KP:");
+    output->print(pid_kp, 2);
+    output->print(" KI:");
+    output->print(pid_ki, 2);
+    output->print(" KD:");
+    output->print(pid_kd, 2);
+    output->print(" AT:");
+    output->println(pid_autotune_active ? "ACTIVE" : "INACTIVE");
   }
   else if (command.startsWith("KP:")) {
     // Command: KP:10.0 (set Kp parameter)

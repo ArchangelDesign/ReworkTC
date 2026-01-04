@@ -86,8 +86,12 @@ bool pid_autotune_active = false;
 uint8_t pid_autotune_cycles = 0;
 float pid_autotune_peak_high = 0;
 float pid_autotune_peak_low = 999;
-unsigned long pid_autotune_peak_time = 0;
-float pid_autotune_output_step = 50.0; // % power for auto-tune
+unsigned long pid_autotune_last_crossing = 0;
+unsigned long pid_autotune_period_sum = 0;
+float pid_autotune_amplitude_sum = 0;
+bool pid_autotune_relay_state = false;
+float pid_autotune_output_step = 70.0; // % power for auto-tune
+unsigned long pid_autotune_stall_timer = 0;
 
 // Software time-proportional control state
 unsigned long ssr_cycle_start = 0;
@@ -114,10 +118,10 @@ void pid_save_settings() {
 void pid_load_settings() {
 #ifdef ESP32
   pid_prefs.begin("pid", true); // read-only mode
-  pid_kp = pid_prefs.getFloat("kp", 1.0);
-  pid_ki = pid_prefs.getFloat("ki", 2.0);
-  pid_kd = pid_prefs.getFloat("kd", 1.0);
-  pid_setpoint = pid_prefs.getShort("setpoint", 37);
+  pid_kp = pid_prefs.getFloat("kp", 10);
+  pid_ki = pid_prefs.getFloat("ki", 0.5);
+  pid_kd = pid_prefs.getFloat("kd", 50.0);
+  pid_setpoint = pid_prefs.getShort("setpoint", 25);
   pid_prefs.end();
 #else
   // AVR EEPROM implementation - check if initialized
@@ -129,8 +133,8 @@ void pid_load_settings() {
   } else {
     // EEPROM not initialized, use defaults
     pid_kp = 1.0;
-    pid_ki = 2.0;
-    pid_kd = 1.0;
+    pid_ki = 0.5;
+    pid_kd = 50;
     pid_setpoint = 37;
   }
 #endif
@@ -194,65 +198,140 @@ void pid_compute() {
   
   pid_last_time = now;
   
-  // Auto-tune mode: simple relay-based tuning
+  // Auto-tune mode: relay-based tuning
   if (pid_autotune_active) {
     float temp = current_temperature_celsius;
     
-    // Simple bang-bang control around setpoint
-    if (temp < pid_setpoint) {
-      pid_current_power = (uint8_t)pid_autotune_output_step;
-      
-      // Track low peak
-      if (temp < pid_autotune_peak_low) {
-        pid_autotune_peak_low = temp;
-      }
-      
-      // Detect crossing upward through setpoint
-      if (pid_last_error < 0 && (pid_setpoint - temp) > 0) {
-        unsigned long period = now - pid_autotune_peak_time;
-        if (period > 5000) { // Valid oscillation
-          pid_autotune_cycles++;
-          pid_autotune_peak_time = now;
-          
-          // After 3 cycles, calculate PID params
-          if (pid_autotune_cycles >= 3) {
-            float amplitude = (pid_autotune_peak_high - pid_autotune_peak_low) / 2.0;
-            float period_sec = period / 1000.0;
-            
-            // Ziegler-Nichols relay method
-            float ku = (4.0 * pid_autotune_output_step) / (3.14159 * amplitude);
-            float tu = period_sec;
-            
-            // PID tuning (conservative)
-            pid_kp = 0.6 * ku;
-            pid_ki = 1.2 * ku / tu;
-            pid_kd = 0.075 * ku * tu;
-            
-            // Save and finish
-            pid_save_settings();
-            pid_autotune_active = false;
-            pid_autotune_cycles = 0;
-            pid_integral = 0;
-            
-            Serial.print("Auto-tune complete! Kp=");
-            Serial.print(pid_kp, 2);
-            Serial.print(" Ki=");
-            Serial.print(pid_ki, 2);
-            Serial.print(" Kd=");
-            Serial.println(pid_kd, 2);
-          }
+    // Initialize on first run
+    if (pid_autotune_cycles == 0 && pid_autotune_last_crossing == 0) {
+      pid_autotune_last_crossing = now;
+      pid_autotune_stall_timer = now;
+      pid_autotune_peak_high = temp;
+      pid_autotune_peak_low = temp;
+      pid_autotune_relay_state = (temp < pid_setpoint);
+      Serial.print("Auto-tune: Starting relay test with ");
+      Serial.print(pid_autotune_output_step, 0);
+      Serial.println("% power");
+      Serial.print("Target: ");
+      Serial.print(pid_setpoint);
+      Serial.print("C, Current: ");
+      Serial.print(temp);
+      Serial.println("C");
+    }
+    
+    // Check if stuck heating without reaching setpoint
+    if (pid_autotune_relay_state && pid_autotune_cycles == 0) {
+      if (now - pid_autotune_stall_timer > 60000) { // 60 seconds
+        if (temp < pid_setpoint - 10) {
+          // Not making progress, increase power
+          pid_autotune_output_step += 10.0;
+          if (pid_autotune_output_step > 90.0) pid_autotune_output_step = 90.0;
+          pid_autotune_stall_timer = now;
+          Serial.print("Auto-tune: Increasing power to ");
+          Serial.print(pid_autotune_output_step, 0);
+          Serial.println("% (not reaching setpoint)");
         }
-      }
-    } else {
-      pid_current_power = 0;
-      
-      // Track high peak
-      if (temp > pid_autotune_peak_high) {
-        pid_autotune_peak_high = temp;
       }
     }
     
-    pid_last_error = pid_setpoint - temp;
+    // Relay control: switch at setpoint
+    bool should_heat = (temp < pid_setpoint);
+    
+    // Detect crossing through setpoint
+    if (should_heat != pid_autotune_relay_state) {
+      pid_autotune_relay_state = should_heat;
+      
+      unsigned long period = now - pid_autotune_last_crossing;
+      
+      // Valid crossing (at least 10 seconds since last)
+      if (period > 10000 && pid_autotune_cycles > 0) {
+        float amplitude = (pid_autotune_peak_high - pid_autotune_peak_low) / 2.0;
+        
+        Serial.print("Auto-tune cycle ");
+        Serial.print(pid_autotune_cycles);
+        Serial.print(": Period=");
+        Serial.print(period / 1000.0);
+        Serial.print("s, Amplitude=");
+        Serial.print(amplitude);
+        Serial.print("C, Peaks=");
+        Serial.print(pid_autotune_peak_low);
+        Serial.print("-");
+        Serial.println(pid_autotune_peak_high);
+        
+        // Accumulate measurements
+        pid_autotune_period_sum += period;
+        pid_autotune_amplitude_sum += amplitude;
+        pid_autotune_cycles++;
+        
+        // Reset peak tracking
+        pid_autotune_peak_high = temp;
+        pid_autotune_peak_low = temp;
+        
+        // After 4 cycles, calculate PID params
+        if (pid_autotune_cycles >= 5) {
+          float avg_amplitude = pid_autotune_amplitude_sum / 4.0;
+          float avg_period = (pid_autotune_period_sum / 4.0) / 1000.0; // Convert to seconds
+          
+          // Ziegler-Nichols relay method
+          float ku = (4.0 * pid_autotune_output_step) / (3.14159 * avg_amplitude);
+          float tu = avg_period;
+          
+          // PID tuning (conservative for safety)
+          pid_kp = 0.45 * ku;
+          pid_ki = 0.54 * ku / tu;
+          pid_kd = 0.075 * ku * tu;
+          
+          // Sanity limits
+          if (pid_kp > 100) pid_kp = 100;
+          if (pid_ki > 10) pid_ki = 10;
+          if (pid_kd > 200) pid_kd = 200;
+          
+          // Save and finish
+          pid_save_settings();
+          pid_autotune_active = false;
+          pid_enabled = false;  // Stop the heater, autotune complete
+          pid_autotune_cycles = 0;
+          pid_autotune_period_sum = 0;
+          pid_autotune_amplitude_sum = 0;
+          pid_integral = 0;
+          
+          Serial.println("=======================================");
+          Serial.println("Auto-tune COMPLETE!");
+          Serial.print("Ku (ultimate gain) = ");
+          Serial.println(ku, 2);
+          Serial.print("Tu (ultimate period) = ");
+          Serial.print(tu, 2);
+          Serial.println("s");
+          Serial.print("New PID values: Kp=");
+          Serial.print(pid_kp, 2);
+          Serial.print(" Ki=");
+          Serial.print(pid_ki, 2);
+          Serial.print(" Kd=");
+          Serial.println(pid_kd, 2);
+          Serial.println("Values saved to memory.");
+          Serial.println("=======================================");
+        }
+      } else if (pid_autotune_cycles == 0) {
+        // First crossing, start counting
+        pid_autotune_cycles = 1;
+        Serial.println("Auto-tune: First crossing detected, starting measurements...");
+      }
+      
+      pid_autotune_last_crossing = now;
+      pid_autotune_stall_timer = now;
+    }
+    
+    // Track peaks
+    if (temp > pid_autotune_peak_high) {
+      pid_autotune_peak_high = temp;
+    }
+    if (temp < pid_autotune_peak_low) {
+      pid_autotune_peak_low = temp;
+    }
+    
+    // Set output based on relay state
+    pid_current_power = pid_autotune_relay_state ? (uint8_t)pid_autotune_output_step : 0;
+    
     return;
   }
   
