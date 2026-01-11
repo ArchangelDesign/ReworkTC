@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#define REWORKTC_VERSION "1.2.0" 
+
 #include <Arduino.h>
 
 #include "display.h"

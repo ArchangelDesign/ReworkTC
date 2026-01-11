@@ -147,6 +147,8 @@ void bt_process_commands() {
     output->print(pid_ki, 2);
     output->print(" KD:");
     output->print(pid_kd, 2);
+    output->print(" VERSION:");
+    output->print(REWORKTC_VERSION);
     output->print(" AT:");
     output->println(pid_autotune_active ? "ACTIVE" : "INACTIVE");
   }
