@@ -163,17 +163,6 @@ void loop() {
   lastErrorState = hasError;
   bt_process_commands();
   
-  // Periodic serial keepalive for CH340 stability
-  #ifdef __AVR__
-  static unsigned long lastKeepalive = 0;
-  if (millis() - lastKeepalive > 1000) {
-    // Send a single byte periodically to keep CH340 responsive
-    Serial.write('\0');  // Null byte won't affect output
-    Serial.flush();
-    lastKeepalive = millis();
-  }
-  #endif
-  
   // Clear any excess data in serial buffer (prevent overflow)
   #ifdef __AVR__
   if (Serial.available() > 64) {
