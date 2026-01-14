@@ -45,21 +45,37 @@ void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
+
+// Pin definitions with defaults for Heltec if not defined
+#ifndef OLED_RESET
 #define OLED_RESET 16
+#endif
+
 #define SCREEN_ADDRESS 0x3C 
+
+#ifndef OLED_SDA
 #define OLED_SDA 4
+#endif
+
+#ifndef OLED_SCL
 #define OLED_SCL 15
+#endif
+
+#ifndef VEXT_CTRL
 #define VEXT_CTRL 21
+#endif
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void display_init() {
   // Power on the OLED display (Heltec boards require this)
-  pinMode(VEXT_CTRL, OUTPUT);
-  digitalWrite(VEXT_CTRL, LOW); // LOW = power ON for Heltec boards
-  delay(50);
+  if (VEXT_CTRL != -1) {
+    pinMode(VEXT_CTRL, OUTPUT);
+    digitalWrite(VEXT_CTRL, LOW); // LOW = power ON for Heltec boards
+    delay(50);
+  }
   
-  // Initialize I2C with Heltec's custom pins
+  // Initialize I2C with custom or default pins
   Wire.begin(OLED_SDA, OLED_SCL);
   
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
