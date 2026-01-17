@@ -37,6 +37,14 @@ void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1
   // No-op when display disabled
 }
 
+void display_error(const char* errorMsg) {
+  Serial.println(errorMsg);
+}
+
+void display_status(float temperature, int pid_current_power, bool pid_enabled, int pid_setpoint) {
+  // No-op when display disabled
+}
+
 #else
 // Display enabled - include libraries and implement full functionality
 #include <Adafruit_GFX.h>
@@ -66,6 +74,12 @@ void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1
 #endif
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool display_initialized = false;
+
+void display_refresh() {
+  if (!display_initialized) return;
+  display.display();
+}
 
 void display_init() {
   // Power on the OLED display (Heltec boards require this)
@@ -80,18 +94,65 @@ void display_init() {
   
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
-    for (;;); // Don't proceed, loop forever
+    return;
   }
+  display_initialized = true;
+  
+  // Flip display if flag is set (for boards mounted upside down)
+  #ifdef FLIP_DISPLAY
+  #if FLIP_DISPLAY==1
+  display.setRotation(2);  // 180 degree rotation
+  #endif
+  #endif
+  
   display.clearDisplay();
-  display.display();
+  display_refresh();
 }
 
 void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1) {
+  if (!display_initialized) return;
   display.setTextSize(size);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(x, y);
   display.println(text);
-  display.display();
 }
+
+void display_error(const char* errorMsg) {
+  if (!display_initialized) return;
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(errorMsg);
+}
+
+void display_status(float temperature, int pid_current_power, bool pid_enabled, int pid_setpoint) {
+  if (!display_initialized) return;
+  display.clearDisplay();
+  char tempStr[20];
+  snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
+  display.setTextSize(3);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(tempStr);
+
+  char powerStr[20];
+  snprintf(powerStr, sizeof(powerStr), "Power: %d%%", pid_current_power);
+  display.setTextSize(1);
+  display.setCursor(0, 30);
+  display.println(powerStr);
+
+  const char* status = (pid_enabled && pid_current_power > 0) ? "HEAT: ON" : "HEAT: OFF";
+  display.setCursor(0, 42);
+  display.println(status);
+
+  if (pid_enabled) {
+    char setpointStr[20];
+    snprintf(setpointStr, sizeof(setpointStr), "Set: %dC", pid_setpoint);
+    display.setCursor(0, 54);
+    display.println(setpointStr);
+  }
+}
+
 
 #endif  // DISABLE_DISPLAY
