@@ -27,6 +27,8 @@
 
 #include <Arduino.h>
 
+#define SCREEN_ADDRESS 0x3C 
+
 #if DISABLE_DISPLAY==1
 // Display disabled - provide stub functions
 void display_init() {
@@ -54,24 +56,6 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
-// Pin definitions with defaults for Heltec if not defined
-#ifndef OLED_RESET
-#define OLED_RESET 16
-#endif
-
-#define SCREEN_ADDRESS 0x3C 
-
-#ifndef OLED_SDA
-#define OLED_SDA 4
-#endif
-
-#ifndef OLED_SCL
-#define OLED_SCL 15
-#endif
-
-#ifndef VEXT_CTRL
-#define VEXT_CTRL 21
-#endif
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 bool display_initialized = false;

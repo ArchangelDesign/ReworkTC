@@ -61,7 +61,7 @@ void thermocouple_init() {
 }
 
 float thermocouple_read_temperature() {
-  return thermocouple.readCelsius();
+  return current_temperature_celsius = thermocouple.readCelsius();
 
   // manual read fallback (if MAX6675 library is not used)
   uint16_t data = 0;
