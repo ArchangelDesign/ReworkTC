@@ -27,6 +27,8 @@
 
 #include <Arduino.h>
 
+#define SCREEN_ADDRESS 0x3C 
+
 #if DISABLE_DISPLAY==1
 // Display disabled - provide stub functions
 void display_init() {
@@ -34,6 +36,14 @@ void display_init() {
 }
 
 void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1) {
+  // No-op when display disabled
+}
+
+void display_error(const char* errorMsg) {
+  Serial.println(errorMsg);
+}
+
+void display_status(float temperature, int pid_current_power, bool pid_enabled, int pid_setpoint) {
   // No-op when display disabled
 }
 
@@ -46,26 +56,23 @@ void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
-// Pin definitions with defaults for Heltec if not defined
-#ifndef OLED_RESET
-#define OLED_RESET 16
-#endif
+extern float pid_kp;
+extern float pid_ki;
+extern float pid_kd;
 
-#define SCREEN_ADDRESS 0x3C 
-
-#ifndef OLED_SDA
-#define OLED_SDA 4
-#endif
-
-#ifndef OLED_SCL
-#define OLED_SCL 15
-#endif
-
-#ifndef VEXT_CTRL
-#define VEXT_CTRL 21
-#endif
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool display_initialized = false;
+
+void display_refresh() {
+  if (!display_initialized) return;
+  display.display();
+}
+
+void display_clear() {
+  if (!display_initialized) return;
+  display.clearDisplay();
+}
 
 void display_init() {
   // Power on the OLED display (Heltec boards require this)
@@ -80,18 +87,77 @@ void display_init() {
   
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
-    for (;;); // Don't proceed, loop forever
+    return;
   }
-  display.clearDisplay();
-  display.display();
+  display_initialized = true;
+  
+  // Flip display if flag is set (for boards mounted upside down)
+  #ifdef FLIP_DISPLAY
+  #if FLIP_DISPLAY==1
+  display.setRotation(2);  // 180 degree rotation
+  #endif
+  #endif
+  
+  display_clear();
+  display_refresh();
 }
 
 void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1) {
+  if (!display_initialized) {
+    return;    
+  }
   display.setTextSize(size);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(x, y);
   display.println(text);
-  display.display();
 }
+
+void display_error(const char* errorMsg) {
+  if (!display_initialized) return;
+
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(errorMsg);
+}
+
+void display_status(float temperature, int pid_current_power, bool pid_enabled, int pid_setpoint) {
+  if (!display_initialized) return;
+
+  char tempStr[20];
+  snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
+  display.setTextSize(3);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(tempStr);
+
+  // Draw power as a bar using '=' signs
+  display.setTextSize(1);
+  display.setCursor(0, 30);
+  int barLength = map(pid_current_power, 0, 100, 0, 18); // 18 chars max
+  char bar[20];
+  for (int i = 0; i < barLength; ++i) bar[i] = '=';
+  for (int i = barLength; i < 18; ++i) bar[i] = ' ';
+  bar[18] = ']';
+  bar[19] = '\0';
+  display.print('[');
+  display.println(bar);
+  
+  display.setCursor(0, 42);
+  display.print("P");
+  display.print(pid_kp);
+  display.print(" I");
+  display.print(pid_ki);
+  display.print(" D");
+  display.print(pid_kd);
+
+  if (pid_enabled) {
+    char setpointStr[20];
+    snprintf(setpointStr, sizeof(setpointStr), "Set: %dC", pid_setpoint);
+    display.setCursor(0, 54);
+    display.println(setpointStr);
+  }
+}
+
 
 #endif  // DISABLE_DISPLAY

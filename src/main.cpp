@@ -63,6 +63,7 @@ void setup() {
   Serial.println("Init display...");
   display_init();
   display_print_text(0, 0, "Starting...", 2);
+  display_refresh();
   delay(300);
   
   Serial.println("Init thermocouple...");
@@ -75,14 +76,13 @@ void setup() {
   
   #if BT_ENABLED==1
   display_print_text(0, 0, "Init BT...", 1);
+  display_refresh();
   delay(200);
   bt_init();
   delay(300);
   #endif
   
-  #if DISABLE_DISPLAY!=1
-  display.clearDisplay();
-  #endif
+  // No need to clear display here, handled in display functions
   Serial.println("ReworkTC Ready");
 }
 
@@ -93,72 +93,18 @@ void loop() {
   
   float temperature = thermocouple_read_temperature();
   bool hasError = isnan(temperature);
-  
-  #if DISABLE_DISPLAY!=1
-  display.clearDisplay();
+  display_clear();
   if (hasError) {
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.println("Error: TC Open");
-    display.display();
+    display_error("Error: TC Open");
     // Only print error once or every 5 seconds to avoid flooding serial buffer
     if (!lastErrorState || (millis() - lastErrorPrint > 5000)) {
-      Serial.println("Thermocouple error: Open circuit");
+      display_error("Thermocouple error: Open circuit");
       lastErrorPrint = millis();
     }
   } else {
-    // Display temperature (large)
-    char tempStr[20];
-    snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
-    display.setTextSize(3);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.println(tempStr);
-    
-    // Display power percentage
-    char powerStr[20];
-    snprintf(powerStr, sizeof(powerStr), "Power: %d%%", pid_current_power);
-    display.setTextSize(1);
-    display.setCursor(0, 30);
-    display.println(powerStr);
-    
-    // Display heater status
-    const char* status = (pid_enabled && pid_current_power > 0) ? "HEAT: ON" : "HEAT: OFF";
-    display.setCursor(0, 42);
-    display.println(status);
-    
-    // Display setpoint if enabled
-    if (pid_enabled) {
-      char setpointStr[20];
-      snprintf(setpointStr, sizeof(setpointStr), "Set: %dC", pid_setpoint);
-      display.setCursor(0, 54);
-      display.println(setpointStr);
-    }
-    
-    display.display();
+    display_status(temperature, pid_current_power, pid_enabled, pid_setpoint);
   }
-  #else
-  // No display - output to serial only
-  if (hasError) {
-    // Only print error once or every 5 seconds to avoid flooding serial buffer
-    if (!lastErrorState || (millis() - lastErrorPrint > 5000)) {
-      Serial.println("Thermocouple error: Open circuit");
-      lastErrorPrint = millis();
-    }
-  } else {
-    char tempStr[20];
-    snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
-    const char* status = (pid_enabled && pid_current_power > 0) ? "HEAT: ON" : "HEAT: OFF";
-    
-    // Serial.print("Temp: ");
-    // Serial.print(tempStr);
-    // Serial.print(" Power: ");
-    // Serial.print(pid_current_power);
-    // Serial.print("% Status: ");
-    // Serial.println(status);
-  }
-  #endif
+  display_refresh();
   
   lastErrorState = hasError;
   bt_process_commands();

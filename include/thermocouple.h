@@ -26,6 +26,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <max6675.h>
 
 // MAX6675 pins - can be overridden via build flags
 #ifndef MAX6675_CLK
@@ -42,7 +43,12 @@
 
 int16_t current_temperature_celsius = 0;
 
+MAX6675 thermocouple(MAX6675_CLK, MAX6675_CS, MAX6675_DO);
+
 void thermocouple_init() {
+  return;
+
+  // manual read fallback (if MAX6675 library is not used)
   pinMode(MAX6675_CS, OUTPUT);
   pinMode(MAX6675_CLK, OUTPUT);
   pinMode(MAX6675_DO, INPUT);
@@ -55,6 +61,9 @@ void thermocouple_init() {
 }
 
 float thermocouple_read_temperature() {
+  return current_temperature_celsius = thermocouple.readCelsius();
+
+  // manual read fallback (if MAX6675 library is not used)
   uint16_t data = 0;
   
   // Start conversion
