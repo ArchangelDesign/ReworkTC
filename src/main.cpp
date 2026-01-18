@@ -84,7 +84,6 @@ void setup() {
   
   // No need to clear display here, handled in display functions
   Serial.println("ReworkTC Ready");
-  display_refresh();
 }
 
 void loop() {
@@ -94,7 +93,7 @@ void loop() {
   
   float temperature = thermocouple_read_temperature();
   bool hasError = isnan(temperature);
-  
+  display_clear();
   if (hasError) {
     display_error("Error: TC Open");
     // Only print error once or every 5 seconds to avoid flooding serial buffer

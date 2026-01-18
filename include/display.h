@@ -56,6 +56,10 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
+extern float pid_kp;
+extern float pid_ki;
+extern float pid_kd;
+
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 bool display_initialized = false;
@@ -63,6 +67,11 @@ bool display_initialized = false;
 void display_refresh() {
   if (!display_initialized) return;
   display.display();
+}
+
+void display_clear() {
+  if (!display_initialized) return;
+  display.clearDisplay();
 }
 
 void display_init() {
@@ -89,12 +98,14 @@ void display_init() {
   #endif
   #endif
   
-  display.clearDisplay();
+  display_clear();
   display_refresh();
 }
 
 void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1) {
-  if (!display_initialized) return;
+  if (!display_initialized) {
+    return;    
+  }
   display.setTextSize(size);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(x, y);
@@ -103,7 +114,7 @@ void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1
 
 void display_error(const char* errorMsg) {
   if (!display_initialized) return;
-  display.clearDisplay();
+
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
@@ -112,7 +123,7 @@ void display_error(const char* errorMsg) {
 
 void display_status(float temperature, int pid_current_power, bool pid_enabled, int pid_setpoint) {
   if (!display_initialized) return;
-  display.clearDisplay();
+
   char tempStr[20];
   snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
   display.setTextSize(3);
@@ -120,15 +131,25 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
   display.setCursor(0, 0);
   display.println(tempStr);
 
-  char powerStr[20];
-  snprintf(powerStr, sizeof(powerStr), "Power: %d%%", pid_current_power);
+  // Draw power as a bar using '=' signs
   display.setTextSize(1);
   display.setCursor(0, 30);
-  display.println(powerStr);
-
-  const char* status = (pid_enabled && pid_current_power > 0) ? "HEAT: ON" : "HEAT: OFF";
+  int barLength = map(pid_current_power, 0, 100, 0, 18); // 18 chars max
+  char bar[20];
+  for (int i = 0; i < barLength; ++i) bar[i] = '=';
+  for (int i = barLength; i < 18; ++i) bar[i] = ' ';
+  bar[18] = ']';
+  bar[19] = '\0';
+  display.print('[');
+  display.println(bar);
+  
   display.setCursor(0, 42);
-  display.println(status);
+  display.print("P");
+  display.print(pid_kp);
+  display.print(" I");
+  display.print(pid_ki);
+  display.print(" D");
+  display.print(pid_kd);
 
   if (pid_enabled) {
     char setpointStr[20];
