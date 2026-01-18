@@ -144,11 +144,10 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
   display.println(bar);
   
   display.setCursor(0, 42);
-  display.print("P");
   display.print(pid_kp);
-  display.print(" I");
+  display.print("  ");
   display.print(pid_ki);
-  display.print(" D");
+  display.print("  ");
   display.print(pid_kd);
 
   if (pid_enabled) {
