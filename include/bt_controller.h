@@ -43,6 +43,7 @@ extern bool pid_autotune_active;
 extern float pid_kp;
 extern float pid_ki;
 extern float pid_kd;
+extern bool hold_power;
 
 extern void pid_save_settings();
 
@@ -225,6 +226,24 @@ void bt_process_commands() {
     } else {
       output->println("ERROR Set valid setpoint first (30-400°C)");
     }
+  }
+  else if (command.startsWith("POWER:")) {
+    // Command: POWER:<value> (manual power control, for testing)
+    int value = command.substring(6).toInt();
+    if (value >= 0 && value <= 100) {
+      hold_power = true;
+      pid_current_power = (uint8_t)value;
+      output->print("OK Power set to ");
+      output->print(pid_current_power);
+      output->println("% (manual override)");
+    } else {
+      output->println("ERROR Invalid power range (0-100)");
+    }
+  }
+  else if (command == "RELEASE") {
+    // Command: POWER:RELEASE (release manual power control)
+    hold_power = false;
+    output->println("OK Power control released to PID");
   }
   else {
     output->println("ERROR Unknown command. Send HELP for commands.");

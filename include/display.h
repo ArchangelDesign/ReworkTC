@@ -59,6 +59,7 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
 extern float pid_kp;
 extern float pid_ki;
 extern float pid_kd;
+extern bool hold_power;
 
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -155,6 +156,10 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
     snprintf(setpointStr, sizeof(setpointStr), "Set: %dC", pid_setpoint);
     display.setCursor(0, 54);
     display.println(setpointStr);
+  }
+  if (hold_power) {
+    display.setCursor(80, 54);
+    display.println("HOLD");
   }
 }
 

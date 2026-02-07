@@ -69,6 +69,8 @@ int16_t pid_setpoint = 37;
 uint8_t pid_holdback = 5;
 bool pid_enabled = false;
 uint8_t pid_current_power = 0; // 0% - 100%
+// if set to true, PID will hold current power level and not adjust
+bool hold_power = false;
 
 // PID parameters
 float pid_kp = 10.0;
@@ -186,6 +188,11 @@ void pid_compute() {
     pid_integral = 0.0;
     pid_last_error = 0.0;
     pid_autotune_active = false;
+    return;
+  }
+
+  if (hold_power) {
+    // Maintain current power level
     return;
   }
   
