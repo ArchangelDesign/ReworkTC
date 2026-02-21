@@ -1,3 +1,3 @@
 # 1.3.0
-- Version report in status
+- Added version report to status
 - Added power lock feature 
