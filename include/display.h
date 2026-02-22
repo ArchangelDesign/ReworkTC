@@ -47,6 +47,12 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
   // No-op when display disabled
 }
 
+void display_refresh() {  
+}
+
+void display_clear() {
+}
+
 #else
 // Display enabled - include libraries and implement full functionality
 #include <Adafruit_GFX.h>
