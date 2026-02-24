@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#define REWORKTC_VERSION "1.3.0" 
+#define REWORKTC_VERSION "1.3.1" 
 
 #include <Arduino.h>
 
@@ -34,7 +34,6 @@
 
 
 void setup() {
-  // put your setup code here, to run once:
 #ifdef __AVR__
   // Arduino Nano/Uno - use lower baud rate for stability
   // CH340 chip on Nano doesn't support Serial readiness check properly
@@ -48,12 +47,10 @@ void setup() {
   delay(500);  // Give CH340 time to stabilize
   Serial.flush();  // Clear any garbage in the buffer
   
-  // Keep sending data to keep CH340 "alive" and responsive
   Serial.println();
   Serial.flush();
   delay(100);
 #else
-  // ESP32 - can handle higher baud rate
   Serial.begin(115200);
   delay(100);
 #endif
@@ -82,12 +79,10 @@ void setup() {
   delay(300);
   #endif
   
-  // No need to clear display here, handled in display functions
   Serial.println("ReworkTC Ready");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   static unsigned long lastErrorPrint = 0;
   static bool lastErrorState = false;
   
@@ -120,5 +115,5 @@ void loop() {
   
   pid_compute();  // Compute PID output
   pid_update_ssr();  // Update SSR state based on time-proportional control
-  delay(250);  // Give MAX6675 time to convert and prevent display flicker
+  delay(250);  // Give MAX6675 time to convert
 }
