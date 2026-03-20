@@ -6,6 +6,7 @@ A versatile PID temperature controller designed for soldering rework stations, r
 
 - **PID Temperature Control**: Precise temperature regulation with tunable PID parameters (Kp, Ki, Kd)
 - **Auto-Tune**: Automatic PID parameter optimization using relay-feedback method
+- **Power Control**: Configurable maximum power limit and manual power override for safety and testing
 - **MAX6675 Thermocouple Interface**: Accurate temperature readings up to 1024°C
 - **Multiple Board Support**: ESP32 (full features), Arduino Uno, or Arduino Nano
 - **OLED Display**: Real-time temperature, power percentage, and status display (ESP32)
@@ -178,8 +179,22 @@ Commands are case-sensitive and end with newline (`\n`).
 | `STATUS` | Get current status | `STATUS` |
 | `KP:<value>` | Set proportional gain | `KP:10.0` |
 | `KI:<value>` | Set integral gain | `KI:0.5` |
-| `KD20
+| `KD:<value>` | Set derivative gain | `KD:50.0` |
+| `TUNE` | Start PID auto-tune | `TUNE` |
+| `POWER:<value>` | Manual power override (0-100%) | `POWER:50` |
+| `RELEASE` | Release manual power control | `RELEASE` |
+| `MAXPOWER:<value>` | Set maximum power limit (saved) | `MAXPOWER:80` |
+| `HELP` | Show command list | `HELP` |
 OK Setpoint=120 (saved)
+
+MAXPOWER:80
+OK Max power limit set to 80% (saved)
+
+POWER:50
+OK Power set to 50% (manual override)
+
+RELEASE
+OK Power control released to PID
 
 TUNE
 OK Auto-tune started. Wait 5-10 minutes...
@@ -193,7 +208,39 @@ ON
 OK PID=ON
 
 STATUS
-SETPOINT:120 ENABLED:1 TEMP:119.8 POWER:28
+SETPOINT:120 ENABLED:1 TEMP:119.8 POWER:28 MAX_POWER:80 HOLD:0 KP:12.34 KI:0.67 KD:45.21 VERSION:1.0 AT:0
+```
+
+#### Power Control Features
+
+**Maximum Power Limit** (`MAXPOWER:<value>`)
+
+Set a maximum power limit to restrict PID output. Useful for safety or when working with delicate components.
+
+- Range: 0-100% (default: 100%)
+- Automatically saved to non-volatile memory
+- Enforced in both normal PID mode and auto-tune mode
+- Example: `MAXPOWER:75` limits heater to 75% maximum power
+
+**Manual Power Override** (`POWER:<value>` and `RELEASE`)
+
+Temporarily override PID control with manual power setting for testing or manual temperature control.
+
+- `POWER:<value>` - Set manual power level (0-100%) and hold
+- `RELEASE` - Release manual control back to PID
+- While in manual mode, display shows "HOLD" indicator
+- STATUS command shows HOLD:1 when active
+- Example use case: Test heater operation without PID
+
+**Example:**
+```
+POWER:50
+OK Power set to 50% (manual override)
+
+[Test heater at 50% power...]
+
+RELEASE
+OK Power control released to PID
 ```
 
 #### Automatic Tuning (Recommended)
@@ -293,6 +340,7 @@ The OLED displays:
 ## Safety Features
 
 - Temperature range limited to 0-400°C
+- Configurable maximum power limit (MAXPOWER command) - saved to non-volatile memory (EEPROM on AVR / NVS on ESP32)
 - Anti-windup protection for integral term
 - Power output clamped to 0-100%
 - Time-proportional control for SSR longevity
