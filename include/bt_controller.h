@@ -265,7 +265,6 @@ void bt_process_commands() {
       output->print("OK Max power limit set to ");
       output->print(max_power_limit);
       output->println("% (saved)");
-      pid_save_settings();
   } else {
     output->println("ERROR Unknown command. Send HELP for commands.");
   }
