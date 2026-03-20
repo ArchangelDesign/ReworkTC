@@ -42,6 +42,7 @@
 #endif
 
 int16_t current_temperature_celsius = 0;
+int16_t offset_temperature = 0;
 
 MAX6675 thermocouple(MAX6675_CLK, MAX6675_CS, MAX6675_DO);
 
@@ -61,7 +62,7 @@ void thermocouple_init() {
 }
 
 float thermocouple_read_temperature() {
-  return current_temperature_celsius = thermocouple.readCelsius();
+  return current_temperature_celsius = thermocouple.readCelsius() + offset_temperature;
 
   // manual read fallback (if MAX6675 library is not used)
   uint16_t data = 0;
@@ -95,7 +96,7 @@ float thermocouple_read_temperature() {
   data >>= 3;
   
   // Convert to Celsius (0.25°C per bit)
-  float temperature = data * 0.25;
+  float temperature = (data + offset_temperature) * 0.25;
   current_temperature_celsius = (int16_t)temperature;
   
   return temperature;

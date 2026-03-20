@@ -62,13 +62,15 @@ Preferences pid_prefs;
 #define EEPROM_KD_ADDR 8
 #define EEPROM_SETPOINT_ADDR 12
 #define EEPROM_MAGIC_ADDR 14
+#define EEPROM_OFFSET_ADDR 16
 #define EEPROM_MAGIC_VALUE 0xAB  // Magic byte to detect if EEPROM is initialized
 #endif
 
 int16_t pid_setpoint = 37;
 uint8_t pid_holdback = 5;
 bool pid_enabled = false;
-uint8_t pid_current_power = 0; // 0% - 100%
+//uint8_t pid_current_power = 0; // 0% - 100%
+float pid_current_power = 0; // 0% - 100%
 // if set to true, PID will hold current power level and not adjust
 bool hold_power = false;
 
@@ -106,6 +108,7 @@ void pid_save_settings() {
   pid_prefs.putFloat("ki", pid_ki);
   pid_prefs.putFloat("kd", pid_kd);
   pid_prefs.putShort("setpoint", pid_setpoint);
+  pid_prefs.putInt("offset", offset_temperature);
   pid_prefs.end();
 #else
   // AVR EEPROM implementation
@@ -113,6 +116,7 @@ void pid_save_settings() {
   EEPROM.put(EEPROM_KI_ADDR, pid_ki);
   EEPROM.put(EEPROM_KD_ADDR, pid_kd);
   EEPROM.put(EEPROM_SETPOINT_ADDR, pid_setpoint);
+  EEPROM.put(EEPROM_OFFSET_ADDR, offset_temperature);
   EEPROM.write(EEPROM_MAGIC_ADDR, EEPROM_MAGIC_VALUE);
 #endif
 }
@@ -124,6 +128,7 @@ void pid_load_settings() {
   pid_ki = pid_prefs.getFloat("ki", 0.5);
   pid_kd = pid_prefs.getFloat("kd", 50.0);
   pid_setpoint = pid_prefs.getShort("setpoint", 25);
+  offset_temperature = pid_prefs.getInt("offset", 0);
   pid_prefs.end();
 #else
   // AVR EEPROM implementation - check if initialized

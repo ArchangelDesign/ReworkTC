@@ -26,15 +26,26 @@
 #define REWORKTC_VERSION "1.3.0" 
 
 #include <Arduino.h>
+#include <Wire.h>
 
 #include "display.h"
 #include "thermocouple.h"
 #include "pid_controller.h"
 #include "bt_controller.h"
+#include "I2C_Anything.h"
 
+#if TOUCH_DISPLAY == 1
+#include "touch_interface.h"
+#endif
 
 void setup() {
   // put your setup code here, to run once:
+  #if TOUCH_DISPLAY == 1
+    #ifndef WIRE_BEGIN_CALLED
+      #define WIRE_BEGIN_CALLED
+        Wire.begin();
+    #endif
+  #endif
 #ifdef __AVR__
   // Arduino Nano/Uno - use lower baud rate for stability
   // CH340 chip on Nano doesn't support Serial readiness check properly
@@ -55,7 +66,6 @@ void setup() {
 #else
   // ESP32 - can handle higher baud rate
   Serial.begin(115200);
-  delay(100);
 #endif
   
   Serial.println("ReworkTC Starting...");
@@ -87,10 +97,14 @@ void setup() {
 }
 
 void loop() {
+  #if TOUCH_DISPLAY==1
+    send_i2c_Status();
+    check_i2c_updates();
+  #endif
+  
   // put your main code here, to run repeatedly:
   static unsigned long lastErrorPrint = 0;
   static bool lastErrorState = false;
-  
   float temperature = thermocouple_read_temperature();
   bool hasError = isnan(temperature);
   display_clear();
@@ -105,10 +119,9 @@ void loop() {
     display_status(temperature, pid_current_power, pid_enabled, pid_setpoint);
   }
   display_refresh();
-  
   lastErrorState = hasError;
   bt_process_commands();
-  
+      // Print the message
   // Clear any excess data in serial buffer (prevent overflow)
   #ifdef __AVR__
   if (Serial.available() > 64) {

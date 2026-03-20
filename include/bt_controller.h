@@ -34,7 +34,7 @@
 extern int16_t pid_setpoint;
 extern uint8_t pid_holdback;
 extern bool pid_enabled;
-extern uint8_t pid_current_power;
+extern float pid_current_power;
 extern float pid_kp;
 extern float pid_ki;
 extern float pid_kd;
@@ -91,7 +91,6 @@ void bt_process_commands() {
   
   String command = input->readStringUntil('\n');
   command.trim();
-  
   if (command.startsWith("SET:")) {
     // Command: SET:150 (set setpoint to 150°C)
     int value = command.substring(4).toInt();
@@ -198,17 +197,25 @@ void bt_process_commands() {
     }
 #endif
   }
+  else if (command.startsWith("OFFSET:")) {
+    int value = command.substring(7).toFloat();
+    offset_temperature = value;
+    output->print("OK offset=");
+    output->print(offset_temperature);
+    output->println(" (saved)");
+  }
   else if (command == "HELP") {
     output->println("Commands:");
-    output->println("  SET:<temp>   - Set setpoint (0-400°C) [auto-saves]");
-    output->println("  ON           - Enable PID");
-    output->println("  OFF          - Disable PID");
-    output->println("  STATUS       - Get current status");
-    output->println("  KP:<value>   - Set Kp parameter [auto-saves]");
-    output->println("  KI:<value>   - Set Ki parameter [auto-saves]");
-    output->println("  KD:<value>   - Set Kd parameter [auto-saves]");
-    output->println("  TUNE         - Start PID auto-tune (requires setpoint)");
-    output->println("  HELP         - Show this help");
+    output->println("  SET:<temp>     - Set setpoint (0-400°C) [auto-saves]");
+    output->println("  ON             - Enable PID");
+    output->println("  OFF            - Disable PID");
+    output->println("  STATUS         - Get current status");
+    output->println("  KP:<value>     - Set Kp parameter [auto-saves]");
+    output->println("  KI:<value>     - Set Ki parameter [auto-saves]");
+    output->println("  KD:<value>     - Set Kd parameter [auto-saves]");
+    output->println("  TUNE           - Start PID auto-tune (requires setpoint)");
+    output->println("  OFFSET:<value> - Set temperature offset");
+    output->println("  HELP           - Show this help");
   }
   else if (command == "TUNE") {
     // Start auto-tune - will be handled in PID loop
@@ -248,7 +255,6 @@ void bt_process_commands() {
   else {
     output->println("ERROR Unknown command. Send HELP for commands.");
   }
-  
 }
 
 void bt_send_status(float temperature, uint8_t power, bool heater_on) {
