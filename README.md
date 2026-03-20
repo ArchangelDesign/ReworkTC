@@ -340,7 +340,7 @@ The OLED displays:
 ## Safety Features
 
 - Temperature range limited to 0-400°C
-- Configurable maximum power limit (MAXPOWER command) - saved to EEPROM
+- Configurable maximum power limit (MAXPOWER command) - saved to non-volatile memory (EEPROM on AVR / NVS on ESP32)
 - Anti-windup protection for integral term
 - Power output clamped to 0-100%
 - Time-proportional control for SSR longevity
