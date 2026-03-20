@@ -45,6 +45,7 @@ void send_i2c_Status()
     I2C_writeAnything(pid_kp);
     I2C_writeAnything(pid_ki);
     I2C_writeAnything(pid_kd);
+    I2C_writeAnything(pid_autotune_active);
     Wire.endTransmission();    // stop transmitting
 }
 
@@ -105,5 +106,12 @@ void check_i2c_updates()
         offset_temperature = ValueToSave.toInt();
         pid_save_settings();
         pid_load_settings();
+        break;
+    case 'A': // Start autotune
+        if (pid_setpoint > 30 && pid_setpoint < 400) {
+            //extern bool pid_autotune_active;
+            pid_autotune_active = true;
+            pid_enabled = true;
+        }
     }
 }

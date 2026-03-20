@@ -91,7 +91,6 @@ void bt_process_commands() {
   
   String command = input->readStringUntil('\n');
   command.trim();
-  Serial.println(command);
   if (command.startsWith("SET:")) {
     // Command: SET:150 (set setpoint to 150°C)
     int value = command.substring(4).toInt();
@@ -256,7 +255,6 @@ void bt_process_commands() {
   else {
     output->println("ERROR Unknown command. Send HELP for commands.");
   }
-  Serial.println(command);
 }
 
 void bt_send_status(float temperature, uint8_t power, bool heater_on) {
