@@ -39,6 +39,7 @@ void send_i2c_Status()
     Wire.beginTransmission(I2C_DEV_ADDR);
     I2C_writeAnything(current_temperature_celsius);
     I2C_writeAnything(offset_temperature);
+    I2C_writeAnything(max_power_limit);
     I2C_writeAnything(pid_setpoint);
     I2C_writeAnything(pid_enabled);
     I2C_writeAnything(pid_current_power);
@@ -102,16 +103,21 @@ void check_i2c_updates()
     case 'O': // Set offset
         ValueToSave = String(message);
         ValueToSave = ValueToSave.substring(ValueToSave.length() - 6);
-        Serial.println(ValueToSave.toFloat());
         offset_temperature = ValueToSave.toInt();
         pid_save_settings();
         pid_load_settings();
         break;
     case 'A': // Start autotune
         if (pid_setpoint > 30 && pid_setpoint < 400) {
-            //extern bool pid_autotune_active;
             pid_autotune_active = true;
             pid_enabled = true;
         }
+        break;
+    case 'M': // Max power limit
+        ValueToSave = String(message);
+        ValueToSave = ValueToSave.substring(ValueToSave.length() - 6);
+        max_power_limit = (uint8_t)ValueToSave.toInt();
+        pid_save_settings();
+        pid_load_settings();
     }
 }

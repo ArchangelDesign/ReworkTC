@@ -34,7 +34,7 @@
 extern int16_t pid_setpoint;
 extern uint8_t pid_holdback;
 extern bool pid_enabled;
-extern float pid_current_power;
+extern uint8_t pid_current_power;
 extern float pid_kp;
 extern float pid_ki;
 extern float pid_kd;
@@ -44,6 +44,7 @@ extern float pid_kp;
 extern float pid_ki;
 extern float pid_kd;
 extern bool hold_power;
+extern uint8_t max_power_limit;
 
 extern void pid_save_settings();
 
@@ -91,6 +92,7 @@ void bt_process_commands() {
   
   String command = input->readStringUntil('\n');
   command.trim();
+  
   if (command.startsWith("SET:")) {
     // Command: SET:150 (set setpoint to 150°C)
     int value = command.substring(4).toInt();
@@ -147,6 +149,10 @@ void bt_process_commands() {
     output->print(pid_ki, 2);
     output->print(" KD:");
     output->print(pid_kd, 2);
+    output->print(" HOLD:");
+    output->print(hold_power ? "1" : "0");
+    output->print(" MAX_POWER:");
+    output->print(max_power_limit);
     output->print(" VERSION:");
     output->print(REWORKTC_VERSION);
     output->print(" AT:");
@@ -196,7 +202,7 @@ void bt_process_commands() {
       Serial.println(pid_kd, 2);
     }
 #endif
-  }
+}
   else if (command.startsWith("OFFSET:")) {
     int value = command.substring(7).toFloat();
     offset_temperature = value;
@@ -206,16 +212,19 @@ void bt_process_commands() {
   }
   else if (command == "HELP") {
     output->println("Commands:");
-    output->println("  SET:<temp>     - Set setpoint (0-400°C) [auto-saves]");
-    output->println("  ON             - Enable PID");
-    output->println("  OFF            - Disable PID");
-    output->println("  STATUS         - Get current status");
-    output->println("  KP:<value>     - Set Kp parameter [auto-saves]");
-    output->println("  KI:<value>     - Set Ki parameter [auto-saves]");
-    output->println("  KD:<value>     - Set Kd parameter [auto-saves]");
-    output->println("  TUNE           - Start PID auto-tune (requires setpoint)");
+    output->println("  SET:<temp>      - Set setpoint (0-400°C) [auto-saves]");
+    output->println("  ON              - Enable PID");
+    output->println("  OFF             - Disable PID");
+    output->println("  STATUS          - Get current status");
+    output->println("  KP:<value>      - Set Kp parameter [auto-saves]");
+    output->println("  KI:<value>      - Set Ki parameter [auto-saves]");
+    output->println("  KD:<value>      - Set Kd parameter [auto-saves]");
+    output->println("  MAXPOWER:<val>  - Set max power limit 0-100% [auto-saves]");
+    output->println("  POWER:<val>     - Manual power override 0-100%");
+    output->println("  RELEASE         - Release manual power control");
+    output->println("  TUNE            - Start PID auto-tune (requires setpoint)");
     output->println("  OFFSET:<value> - Set temperature offset");
-    output->println("  HELP           - Show this help");
+    output->println("  HELP            - Show this help");
   }
   else if (command == "TUNE") {
     // Start auto-tune - will be handled in PID loop
@@ -252,7 +261,19 @@ void bt_process_commands() {
     hold_power = false;
     output->println("OK Power control released to PID");
   }
-  else {
+  else if (command.startsWith("MAXPOWER:")) {
+    // Command: MAXPOWER:<value> (set maximum power limit for PID)
+    int value = command.substring(9).toInt();
+    if (value < 0 || value > 100) {
+      output->println("ERROR Invalid max power range (0-100)");
+      return;
+    } 
+      max_power_limit = (uint8_t)value;
+      pid_save_settings();
+      output->print("OK Max power limit set to ");
+      output->print(max_power_limit);
+      output->println("% (saved)");
+  } else {
     output->println("ERROR Unknown command. Send HELP for commands.");
   }
 }

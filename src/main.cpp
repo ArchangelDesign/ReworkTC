@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#define REWORKTC_VERSION "1.3.0" 
+#define REWORKTC_VERSION "1.3.1" 
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -34,13 +34,13 @@
 #include "bt_controller.h"
 #include "I2C_Anything.h"
 
+
 #if TOUCH_DISPLAY == 1
 #include "touch_interface.h"
 #endif
 
 void setup() {
-  // put your setup code here, to run once:
-  #if TOUCH_DISPLAY == 1
+   #if TOUCH_DISPLAY == 1
     #ifndef WIRE_BEGIN_CALLED
       #define WIRE_BEGIN_CALLED
         Wire.begin();
@@ -59,13 +59,12 @@ void setup() {
   delay(500);  // Give CH340 time to stabilize
   Serial.flush();  // Clear any garbage in the buffer
   
-  // Keep sending data to keep CH340 "alive" and responsive
   Serial.println();
   Serial.flush();
   delay(100);
 #else
-  // ESP32 - can handle higher baud rate
   Serial.begin(115200);
+  delay(100);
 #endif
   
   Serial.println("ReworkTC Starting...");
@@ -92,19 +91,13 @@ void setup() {
   delay(300);
   #endif
   
-  // No need to clear display here, handled in display functions
   Serial.println("ReworkTC Ready");
 }
 
 void loop() {
-  #if TOUCH_DISPLAY==1
-    send_i2c_Status();
-    check_i2c_updates();
-  #endif
-  
-  // put your main code here, to run repeatedly:
   static unsigned long lastErrorPrint = 0;
   static bool lastErrorState = false;
+  
   float temperature = thermocouple_read_temperature();
   bool hasError = isnan(temperature);
   display_clear();
@@ -119,9 +112,10 @@ void loop() {
     display_status(temperature, pid_current_power, pid_enabled, pid_setpoint);
   }
   display_refresh();
+  
   lastErrorState = hasError;
   bt_process_commands();
-      // Print the message
+  
   // Clear any excess data in serial buffer (prevent overflow)
   #ifdef __AVR__
   if (Serial.available() > 64) {
@@ -133,5 +127,10 @@ void loop() {
   
   pid_compute();  // Compute PID output
   pid_update_ssr();  // Update SSR state based on time-proportional control
-  delay(250);  // Give MAX6675 time to convert and prevent display flicker
+  delay(250);  // Give MAX6675 time to convert
+
+   #if TOUCH_DISPLAY==1
+    send_i2c_Status();
+    check_i2c_updates();
+  #endif
 }
