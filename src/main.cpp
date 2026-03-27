@@ -32,6 +32,10 @@
 #include "pid_controller.h"
 #include "bt_controller.h"
 
+#ifdef REWORK2
+#include "HeaterController.h"
+#endif
+
 
 void setup() {
 #ifdef __AVR__
