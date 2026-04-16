@@ -40,9 +40,6 @@ extern float pid_ki;
 extern float pid_kd;
 extern int16_t current_temperature_celsius;
 extern bool pid_autotune_active;
-extern float pid_kp;
-extern float pid_ki;
-extern float pid_kd;
 extern bool hold_power;
 extern uint8_t max_power_limit;
 

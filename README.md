@@ -161,6 +161,7 @@ build_flags =
     -DHEATER_LED_PIN=22         ; Status LED pin
     -DSSR_PERIOD_MS=2000        ; SSR PWM cycle time (ms)
     -DMAX6675_CLK=18            ; MAX6675 clock pin(ESP32) and Serial. 
+```
 
 **Serial Settings:**
 - ESP32: 115200 baud
@@ -185,6 +186,7 @@ Commands are case-sensitive and end with newline (`\n`).
 | `RELEASE` | Release manual power control | `RELEASE` |
 | `MAXPOWER:<value>` | Set maximum power limit (saved) | `MAXPOWER:80` |
 | `HELP` | Show command list | `HELP` |
+
 OK Setpoint=120 (saved)
 
 MAXPOWER:80
@@ -208,8 +210,7 @@ ON
 OK PID=ON
 
 STATUS
-SETPOINT:120 ENABLED:1 TEMP:119.8 POWER:28 MAX_POWER:80 HOLD:0 KP:12.34 KI:0.67 KD:45.21 VERSION:1.0 AT:0
-```
+SETPOINT:120 ENABLED:1 TEMP:119.8 POWER:28 MAX_POWER:80 HOLD:0 KP:12.34 KI:0.67 KD:45.21 MAX_POWER:100 VERSION:1.0 AT:0
 
 #### Power Control Features
 
