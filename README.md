@@ -285,3 +285,17 @@ Values are automatically saved to persistent storage.
 - **Derivative filtering**: Low-pass filter reduces thermocouple noise
 - **Smart anti-windup**: Integral only accumulates when output is 5-95%
 - **Direct percentage output**: 0-100% power to heater
+
+## License
+
+Copyright (c) 2025 Black Horse Repairs LLC
+
+Licensed under the MIT License. See project files for full license text.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests.
+
+## Support
+
+For support and questions, please open an issue on the repository.
