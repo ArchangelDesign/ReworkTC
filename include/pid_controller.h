@@ -146,7 +146,7 @@ void pid_load_settings() {
     EEPROM.get(EEPROM_KD_ADDR, pid_kd);
     EEPROM.get(EEPROM_SETPOINT_ADDR, pid_setpoint);
     max_power_limit = EEPROM.read(EEPROM_MAX_POWER_ADDR);
-    if (max_power_limit == 0 || max_power_limit > 100) max_power_limit = 100;
+    if (max_power_limit > 100) max_power_limit = 0;
   } else {
     // EEPROM not initialized, use defaults
     pid_kp = 1.0;
