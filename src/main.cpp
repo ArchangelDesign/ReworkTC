@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#define REWORKTC_VERSION "1.3.1" 
+#define REWORKTC_VERSION "1.3.2" 
 
 #include <Arduino.h>
 
@@ -55,19 +55,19 @@ void setup() {
   delay(100);
 #endif
   
-  Serial.println("ReworkTC Starting...");
+  Serial.println(F("ReworkTC Starting..."));
   
-  Serial.println("Init display...");
+  Serial.println(F("Init display..."));
   display_init();
   display_print_text(0, 0, "Starting...", 2);
   display_refresh();
   delay(300);
   
-  Serial.println("Init thermocouple...");
+  Serial.println(F("Init thermocouple..."));
   thermocouple_init();
   delay(100);
   
-  Serial.println("Init PID...");
+  Serial.println(F("Init PID..."));
   pid_init();
   delay(100);
   
@@ -79,7 +79,7 @@ void setup() {
   delay(300);
   #endif
   
-  Serial.println("ReworkTC Ready");
+  Serial.println(F("ReworkTC Ready"));
 }
 
 void loop() {

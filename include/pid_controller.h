@@ -62,6 +62,7 @@ Preferences pid_prefs;
 #define EEPROM_KD_ADDR 8
 #define EEPROM_SETPOINT_ADDR 12
 #define EEPROM_MAGIC_ADDR 14
+#define EEPROM_MAX_POWER_ADDR 15
 #define EEPROM_MAGIC_VALUE 0xAB  // Magic byte to detect if EEPROM is initialized
 #endif
 
@@ -71,16 +72,25 @@ bool pid_enabled = false;
 uint8_t pid_current_power = 0; // 0% - 100%
 // if set to true, PID will hold current power level and not adjust
 bool hold_power = false;
+uint8_t max_power_limit = 100; // Max power limit
 
-// PID parameters
+// PID parameters - use smaller precision on AVR to save RAM
+#ifdef __AVR__
+// On AVR, we can use smaller types to save memory
 float pid_kp = 10.0;
 float pid_ki = 0.5;
 float pid_kd = 50.0;
-
-// PID internal state
 float pid_integral = 0.0;
 float pid_last_error = 0.0;
-float pid_last_derivative = 0.0;  // For derivative filtering
+float pid_last_derivative = 0.0;
+#else
+float pid_kp = 10.0;
+float pid_ki = 0.5;
+float pid_kd = 50.0;
+float pid_integral = 0.0;
+float pid_last_error = 0.0;
+float pid_last_derivative = 0.0;
+#endif
 unsigned long pid_last_time = 0;
 
 // Auto-tune state
@@ -106,6 +116,7 @@ void pid_save_settings() {
   pid_prefs.putFloat("ki", pid_ki);
   pid_prefs.putFloat("kd", pid_kd);
   pid_prefs.putShort("setpoint", pid_setpoint);
+  pid_prefs.putUChar("maxpower", max_power_limit);
   pid_prefs.end();
 #else
   // AVR EEPROM implementation
@@ -113,6 +124,7 @@ void pid_save_settings() {
   EEPROM.put(EEPROM_KI_ADDR, pid_ki);
   EEPROM.put(EEPROM_KD_ADDR, pid_kd);
   EEPROM.put(EEPROM_SETPOINT_ADDR, pid_setpoint);
+  EEPROM.write(EEPROM_MAX_POWER_ADDR, max_power_limit);
   EEPROM.write(EEPROM_MAGIC_ADDR, EEPROM_MAGIC_VALUE);
 #endif
 }
@@ -124,6 +136,7 @@ void pid_load_settings() {
   pid_ki = pid_prefs.getFloat("ki", 0.5);
   pid_kd = pid_prefs.getFloat("kd", 50.0);
   pid_setpoint = pid_prefs.getShort("setpoint", 25);
+  max_power_limit = pid_prefs.getUChar("maxpower", 100);
   pid_prefs.end();
 #else
   // AVR EEPROM implementation - check if initialized
@@ -132,12 +145,15 @@ void pid_load_settings() {
     EEPROM.get(EEPROM_KI_ADDR, pid_ki);
     EEPROM.get(EEPROM_KD_ADDR, pid_kd);
     EEPROM.get(EEPROM_SETPOINT_ADDR, pid_setpoint);
+    max_power_limit = EEPROM.read(EEPROM_MAX_POWER_ADDR);
+    if (max_power_limit > 100) max_power_limit = 0;
   } else {
     // EEPROM not initialized, use defaults
     pid_kp = 1.0;
     pid_ki = 0.5;
     pid_kd = 50;
     pid_setpoint = 37;
+    max_power_limit = 100;
   }
 #endif
 }
@@ -216,14 +232,16 @@ void pid_compute() {
       pid_autotune_peak_high = temp;
       pid_autotune_peak_low = temp;
       pid_autotune_relay_state = (temp < pid_setpoint);
-      Serial.print("Auto-tune: Starting relay test with ");
+      #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+      Serial.print(F("Auto-tune: Starting relay test with "));
       Serial.print(pid_autotune_output_step, 0);
-      Serial.println("% power");
-      Serial.print("Target: ");
+      Serial.println(F("% power"));
+      Serial.print(F("Target: "));
       Serial.print(pid_setpoint);
-      Serial.print("C, Current: ");
+      Serial.print(F("C, Current: "));
       Serial.print(temp);
-      Serial.println("C");
+      Serial.println(F("C"));
+      #endif
     }
     
     // Check if stuck heating without reaching setpoint
@@ -234,9 +252,11 @@ void pid_compute() {
           pid_autotune_output_step += 10.0;
           if (pid_autotune_output_step > 90.0) pid_autotune_output_step = 90.0;
           pid_autotune_stall_timer = now;
-          Serial.print("Auto-tune: Increasing power to ");
+          #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+          Serial.print(F("Auto-tune: Increasing power to "));
           Serial.print(pid_autotune_output_step, 0);
-          Serial.println("% (not reaching setpoint)");
+          Serial.println(F("% (not reaching setpoint)"));
+          #endif
         }
       }
     }
@@ -254,16 +274,18 @@ void pid_compute() {
       if (period > 10000 && pid_autotune_cycles > 0) {
         float amplitude = (pid_autotune_peak_high - pid_autotune_peak_low) / 2.0;
         
-        Serial.print("Auto-tune cycle ");
+        #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+        Serial.print(F("Auto-tune cycle "));
         Serial.print(pid_autotune_cycles);
-        Serial.print(": Period=");
+        Serial.print(F(": Period="));
         Serial.print(period / 1000.0);
-        Serial.print("s, Amplitude=");
+        Serial.print(F("s, Amplitude="));
         Serial.print(amplitude);
-        Serial.print("C, Peaks=");
+        Serial.print(F("C, Peaks="));
         Serial.print(pid_autotune_peak_low);
-        Serial.print("-");
+        Serial.print(F("-"));
         Serial.println(pid_autotune_peak_high);
+        #endif
         
         // Accumulate measurements
         pid_autotune_period_sum += period;
@@ -302,26 +324,30 @@ void pid_compute() {
           pid_autotune_amplitude_sum = 0;
           pid_integral = 0;
           
-          Serial.println("=======================================");
-          Serial.println("Auto-tune COMPLETE!");
-          Serial.print("Ku (ultimate gain) = ");
+          Serial.println(F("======================================="));
+          Serial.println(F("Auto-tune COMPLETE!"));
+          #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+          Serial.print(F("Ku (ultimate gain) = "));
           Serial.println(ku, 2);
-          Serial.print("Tu (ultimate period) = ");
+          Serial.print(F("Tu (ultimate period) = "));
           Serial.print(tu, 2);
-          Serial.println("s");
-          Serial.print("New PID values: Kp=");
+          Serial.println(F("s"));
+          #endif
+          Serial.print(F("New PID values: Kp="));
           Serial.print(pid_kp, 2);
-          Serial.print(" Ki=");
+          Serial.print(F(" Ki="));
           Serial.print(pid_ki, 2);
-          Serial.print(" Kd=");
+          Serial.print(F(" Kd="));
           Serial.println(pid_kd, 2);
-          Serial.println("Values saved to memory.");
-          Serial.println("=======================================");
+          Serial.println(F("Values saved to memory."));
+          Serial.println(F("======================================="));
         }
       } else if (pid_autotune_cycles == 0) {
         // First crossing, start counting
         pid_autotune_cycles = 1;
-        Serial.println("Auto-tune: First crossing detected, starting measurements...");
+        #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+        Serial.println(F("Auto-tune: First crossing detected, starting measurements..."));
+        #endif
       }
       
       pid_autotune_last_crossing = now;
@@ -338,6 +364,11 @@ void pid_compute() {
     
     // Set output based on relay state
     pid_current_power = pid_autotune_relay_state ? (uint8_t)pid_autotune_output_step : 0;
+    
+    // Enforce power limit
+    if (pid_current_power > max_power_limit) {
+      pid_current_power = max_power_limit;
+    }
     
     return;
   }
@@ -375,6 +406,11 @@ void pid_compute() {
   // Clamp to 0-100%
   if (output < 0) output = 0;
   if (output > 100) output = 100;
+  
+  // Enforce power limit
+  if (output > max_power_limit) {
+    output = max_power_limit;
+  }
   
   pid_current_power = (uint8_t)output;
 }

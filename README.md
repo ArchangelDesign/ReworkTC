@@ -6,6 +6,7 @@ A versatile PID temperature controller designed for soldering rework stations, r
 
 - **PID Temperature Control**: Precise temperature regulation with tunable PID parameters (Kp, Ki, Kd)
 - **Auto-Tune**: Automatic PID parameter optimization using relay-feedback method
+- **Power Control**: Configurable maximum power limit and manual power override for safety and testing
 - **MAX6675 Thermocouple Interface**: Accurate temperature readings up to 1024°C
 - **Multiple Board Support**: ESP32 (full features), Arduino Uno, or Arduino Nano
 - **OLED Display**: Real-time temperature, power percentage, and status display (ESP32)
@@ -160,6 +161,7 @@ build_flags =
     -DHEATER_LED_PIN=22         ; Status LED pin
     -DSSR_PERIOD_MS=2000        ; SSR PWM cycle time (ms)
     -DMAX6675_CLK=18            ; MAX6675 clock pin(ESP32) and Serial. 
+```
 
 **Serial Settings:**
 - ESP32: 115200 baud
@@ -178,8 +180,23 @@ Commands are case-sensitive and end with newline (`\n`).
 | `STATUS` | Get current status | `STATUS` |
 | `KP:<value>` | Set proportional gain | `KP:10.0` |
 | `KI:<value>` | Set integral gain | `KI:0.5` |
-| `KD20
+| `KD:<value>` | Set derivative gain | `KD:50.0` |
+| `TUNE` | Start PID auto-tune | `TUNE` |
+| `POWER:<value>` | Manual power override (0-100%) | `POWER:50` |
+| `RELEASE` | Release manual power control | `RELEASE` |
+| `MAXPOWER:<value>` | Set maximum power limit (saved) | `MAXPOWER:80` |
+| `HELP` | Show command list | `HELP` |
+
 OK Setpoint=120 (saved)
+
+MAXPOWER:80
+OK Max power limit set to 80% (saved)
+
+POWER:50
+OK Power set to 50% (manual override)
+
+RELEASE
+OK Power control released to PID
 
 TUNE
 OK Auto-tune started. Wait 5-10 minutes...
@@ -193,7 +210,38 @@ ON
 OK PID=ON
 
 STATUS
-SETPOINT:120 ENABLED:1 TEMP:119.8 POWER:28
+SETPOINT:120 ENABLED:1 TEMP:119.8 POWER:28 MAX_POWER:80 HOLD:0 KP:12.34 KI:0.67 KD:45.21 MAX_POWER:100 VERSION:1.0 AT:0
+
+#### Power Control Features
+
+**Maximum Power Limit** (`MAXPOWER:<value>`)
+
+Set a maximum power limit to restrict PID output. Useful for safety or when working with delicate components.
+
+- Range: 0-100% (default: 100%)
+- Automatically saved to non-volatile memory
+- Enforced in both normal PID mode and auto-tune mode
+- Example: `MAXPOWER:75` limits heater to 75% maximum power
+
+**Manual Power Override** (`POWER:<value>` and `RELEASE`)
+
+Temporarily override PID control with manual power setting for testing or manual temperature control.
+
+- `POWER:<value>` - Set manual power level (0-100%) and hold
+- `RELEASE` - Release manual control back to PID
+- While in manual mode, display shows "HOLD" indicator
+- STATUS command shows HOLD:1 when active
+- Example use case: Test heater operation without PID
+
+**Example:**
+```
+POWER:50
+OK Power set to 50% (manual override)
+
+[Test heater at 50% power...]
+
+RELEASE
+OK Power control released to PID
 ```
 
 #### Automatic Tuning (Recommended)
@@ -211,7 +259,7 @@ The auto-tune will:
 - Calculate optimal PID values
 - Save to EEPROM/flash automatically
 
-**⚠️ Monitor temperature during auto-tune!** Stop if unstable.
+** Monitor temperature during auto-tune!** Stop if unstable.
 
 #### Manual Tuning
 
@@ -237,88 +285,7 @@ Values are automatically saved to persistent storage.
 - **Update rate**: 250ms (4 Hz) for responsive control
 - **Derivative filtering**: Low-pass filter reduces thermocouple noise
 - **Smart anti-windup**: Integral only accumulates when output is 5-95%
-- **Direct percentage output**: 0-100% power to heater|
-| `KD:<value>` | Set deri (ESP32)**
-- Verify `BT_ENABLED=1` in build flags
-- Check device appears as "ReworkTC"
-- Ensure no other device is connected
-
-**PID oscillates or overshoots**
-- Run auto-tune: `TUNE` command
-- If manual tuning: reduce Kp, increase Kd
-- Verify SSR cycle time is appropriate (default 2000ms)
-
-**Serial port won't open on Arduino Nano**
-- **CH340 USB chip issue**: Common with cheap Nano clones
-- **Solution 1**: Use Arduino Uno (has better ATmega16U2 USB chip)
-- **Solution 2**: Connect external FT232 module to TX/RX pins
-- **Solution 3**: Try different Nano board (CH340 quality varies)
-- Note: This is a hardware limitation, not a firmware issue
-
-**C# application can't connect to Nano**
-- CH340 driver incompatibility with .NET SerialPort class
-- Use Arduino Uno or external FT232 USB-Serial converter
-- PlatformIO monitor and Python work fine, but some .NET implementations fail
-
-ON
-OK PID=ON
-
-STATUS
-SETPOINT:180 ENABLED:1 TEMP:175.5 POWER:45
-```
-
-**Via Bluetooth:**
-- Connect to device named `ReworkTC`
-- Send same commands as Serial
-
-### PID Tuning
-
-Default PID values are conservative. Adjust based on your system:
-
-1. Start with: `KP:1.0`, `KI:2.0`, `KD:1.0`
-2. Increase Kp for faster response
-3. Increase Ki to eliminate steady-state error
-4. Increase Kd to reduce overshoot
-
-Values are automatically saved to flash memory.
-
-## Display Information
-
-The OLED displays:
-- **Large**: Current temperature in °C
-- **Power**: Heater power percentage (0-100%)
-- **HEAT**: ON/OFF status
-- **Set**: Target temperature (when PID enabled)
-
-## Safety Features
-
-- Temperature range limited to 0-400°C
-- Anti-windup protection for integral term
-- Power output clamped to 0-100%
-- Time-proportional control for SSR longevity
-- Thermocouple open-circuit detection
-
-## Troubleshooting
-
-**Display shows "Error: TC Open"**
-- Check thermocouple connections
-- Verify MAX6675 wiring
-- Ensure thermocouple polarity is correct
-
-**Temperature readings incorrect**
-- Verify GPIO pin assignments match hardware
-- Check thermocouple type (K-type required)
-- Ensure proper grounding
-
-**No Bluetooth connection**
-- Verify `BT_ENABLED=1` in build flags
-- Check device appears as "ReworkTC"
-- Ensure no other device is connected
-
-**PID oscillates or overshoots**
-- Reduce Kp gain
-- Increase Kd gain
-- Reduce SSR cycle time if too slow
+- **Direct percentage output**: 0-100% power to heater
 
 ## License
 
