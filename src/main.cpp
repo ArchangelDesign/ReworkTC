@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#define REWORKTC_VERSION "1.3.1" 
+#define REWORKTC_VERSION "1.3.2" 
 
 #include <Arduino.h>
 
