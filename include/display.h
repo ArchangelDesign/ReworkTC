@@ -32,7 +32,7 @@
 #if DISABLE_DISPLAY==1
 // Display disabled - provide stub functions
 void display_init() {
-  Serial.println("Display disabled by build flag");
+  Serial.println(F("Display disabled by build flag"));
 }
 
 void display_print_text(int16_t x, int16_t y, const char* text, uint8_t size = 1) {
@@ -131,7 +131,7 @@ void display_error(const char* errorMsg) {
 void display_status(float temperature, int pid_current_power, bool pid_enabled, int pid_setpoint) {
   if (!display_initialized) return;
 
-  char tempStr[20];
+  char tempStr[10];  // Reduced from 20
   snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
   display.setTextSize(3);
   display.setTextColor(SSD1306_WHITE);
@@ -142,7 +142,7 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
   display.setTextSize(1);
   display.setCursor(0, 30);
   int barLength = map(pid_current_power, 0, 100, 0, 18); // 18 chars max
-  char bar[20];
+  char bar[20];  // Keep at 20 for the bar display
   for (int i = 0; i < barLength; ++i) bar[i] = '=';
   for (int i = barLength; i < 18; ++i) bar[i] = ' ';
   bar[18] = ']';
@@ -158,7 +158,7 @@ void display_status(float temperature, int pid_current_power, bool pid_enabled, 
   display.print(pid_kd);
 
   if (pid_enabled) {
-    char setpointStr[20];
+    char setpointStr[12];  // Reduced from 20
     snprintf(setpointStr, sizeof(setpointStr), "Set: %dC", pid_setpoint);
     display.setCursor(0, 54);
     display.println(setpointStr);

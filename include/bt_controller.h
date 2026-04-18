@@ -40,9 +40,6 @@ extern float pid_ki;
 extern float pid_kd;
 extern int16_t current_temperature_celsius;
 extern bool pid_autotune_active;
-extern float pid_kp;
-extern float pid_ki;
-extern float pid_kd;
 extern bool hold_power;
 extern uint8_t max_power_limit;
 
@@ -56,14 +53,14 @@ void bt_init() {
     SerialBT = new BluetoothSerial();
   }
   if (SerialBT->begin("ReworkTC")) {
-    Serial.println("Bluetooth initialized as 'ReworkTC'");
+    Serial.println(F("Bluetooth initialized as 'ReworkTC'"));
   } else {
-    Serial.println("Bluetooth init failed!");
+    Serial.println(F("Bluetooth init failed!"));
   }
 }
 #else
 void bt_init() {
-  Serial.println("Bluetooth disabled by build flag");
+  Serial.println(F("Bluetooth disabled by build flag"));
 }
 #endif
 
@@ -90,115 +87,129 @@ void bt_process_commands() {
     return;
   }
   
-  String command = input->readStringUntil('\n');
-  command.trim();
+  // Replace String with char buffer to save RAM
+  char command[32];  // Fixed buffer instead of String object
+  int idx = 0;
   
-  if (command.startsWith("SET:")) {
+  // Read command into buffer
+  while (input->available() && idx < 31) {
+    char c = input->read();
+    if (c == '\n' || c == '\r') break;
+    command[idx++] = c;
+  }
+  command[idx] = '\0';
+  
+  // Trim leading/trailing spaces
+  while (idx > 0 && (command[idx-1] == ' ' || command[idx-1] == '\t')) {
+    command[--idx] = '\0';
+  }
+  
+  if (strncmp(command, "SET:", 4) == 0) {
     // Command: SET:150 (set setpoint to 150°C)
-    int value = command.substring(4).toInt();
+    int value = atoi(command + 4);
     if (value >= 0 && value <= 400) {
       pid_setpoint = value;
       pid_save_settings();
-      output->print("OK Setpoint=");
+      output->print(F("OK Setpoint="));
       output->print(pid_setpoint);
-      output->println(" (saved)");
+      output->println(F(" (saved)"));
 #if BT_ENABLED==1
       if (from_bt) {
-        Serial.print("BT: Setpoint set to ");
+        Serial.print(F("BT: Setpoint set to "));
         Serial.print(pid_setpoint);
-        Serial.println("°C");
+        Serial.println(F("°C"));
       }
 #endif
     } else {
-      output->println("ERROR Invalid setpoint range (0-400)");
+      output->println(F("ERROR Invalid setpoint range (0-400)"));
     }
   }
-  else if (command == "ON") {
+  else if (strcmp(command, "ON") == 0) {
     // Command: ON (enable PID)
     pid_enabled = true;
-    output->println("OK PID=ON");
+    output->println(F("OK PID=ON"));
 #if BT_ENABLED==1
     if (from_bt) {
-      Serial.println("BT: PID enabled");
+      Serial.println(F("BT: PID enabled"));
     }
 #endif
   }
-  else if (command == "OFF") {
+  else if (strcmp(command, "OFF") == 0) {
     // Command: OFF (disable PID)
     pid_enabled = false;
-    output->println("OK PID=OFF");
+    output->println(F("OK PID=OFF"));
 #if BT_ENABLED==1
     if (from_bt) {
-      Serial.println("BT: PID disabled");
+      Serial.println(F("BT: PID disabled"));
     }
 #endif
   }
-  else if (command == "STATUS") {
+  else if (strcmp(command, "STATUS") == 0) {
     // Command: STATUS (request current status)
-    output->print("SETPOINT:");
+    output->print(F("SETPOINT:"));
     output->print(pid_setpoint);
-    output->print(" ENABLED:");
+    output->print(F(" ENABLED:"));
     output->print(pid_enabled);
-    output->print(" TEMP:");
+    output->print(F(" TEMP:"));
     output->print((float)current_temperature_celsius);
-    output->print(" POWER:");
+    output->print(F(" POWER:"));
     output->print(pid_current_power);
-    output->print(" KP:");
+    output->print(F(" KP:"));
     output->print(pid_kp, 2);
-    output->print(" KI:");
+    output->print(F(" KI:"));
     output->print(pid_ki, 2);
-    output->print(" KD:");
+    output->print(F(" KD:"));
     output->print(pid_kd, 2);
-    output->print(" HOLD:");
+    output->print(F(" HOLD:"));
     output->print(hold_power ? "1" : "0");
-    output->print(" MAX_POWER:");
+    output->print(F(" MAX_POWER:"));
     output->print(max_power_limit);
-    output->print(" VERSION:");
+    output->print(F(" VERSION:"));
     output->print(REWORKTC_VERSION);
-    output->print(" AT:");
-    output->println(pid_autotune_active ? "ACTIVE" : "INACTIVE");
+    output->print(F(" AT:"));
+    output->println(pid_autotune_active ? F("ACTIVE") : F("INACTIVE"));
   }
-  else if (command.startsWith("KP:")) {
+  else if (strncmp(command, "KP:", 3) == 0) {
     // Command: KP:10.0 (set Kp parameter)
-    float value = command.substring(3).toFloat();
+    float value = atof(command + 3);
     pid_kp = value;
     pid_save_settings();
-    output->print("OK Kp=");
+    output->print(F("OK Kp="));
     output->print(pid_kp, 2);
-    output->println(" (saved)");
+    output->println(F(" (saved)"));
 #if BT_ENABLED==1
     if (from_bt) {
-      Serial.print("BT: Kp set to ");
+      Serial.print(F("BT: Kp set to "));
       Serial.println(pid_kp, 2);
     }
 #endif
   }
-  else if (command.startsWith("KI:")) {
+  else if (strncmp(command, "KI:", 3) == 0) {
     // Command: KI:61.0 (set Ki parameter)
-    float value = command.substring(3).toFloat();
+    float value = atof(command + 3);
     pid_ki = value;
     pid_save_settings();
-    output->print("OK Ki=");
+    output->print(F("OK Ki="));
     output->print(pid_ki, 2);
-    output->println(" (saved)");
+    output->println(F(" (saved)"));
 #if BT_ENABLED==1
     if (from_bt) {
-      Serial.print("BT: Ki set to ");
+      Serial.print(F("BT: Ki set to "));
       Serial.println(pid_ki, 2);
     }
 #endif
   }
-  else if (command.startsWith("KD:")) {
+  else if (strncmp(command, "KD:", 3) == 0) {
     // Command: KD:9.0 (set Kd parameter)
-    float value = command.substring(3).toFloat();
+    float value = atof(command + 3);
     pid_kd = value;
     pid_save_settings();
-    output->print("OK Kd=");
+    output->print(F("OK Kd="));
     output->print(pid_kd, 2);
-    output->println(" (saved)");
+    output->println(F(" (saved)"));
 #if BT_ENABLED==1
     if (from_bt) {
-      Serial.print("BT: Kd set to ");
+      Serial.print(F("BT: Kd set to "));
       Serial.println(pid_kd, 2);
     }
 #endif
@@ -210,86 +221,86 @@ void bt_process_commands() {
     output->print(offset_temperature);
     output->println(" (saved)");
   }
-  else if (command == "HELP") {
-    output->println("Commands:");
-    output->println("  SET:<temp>      - Set setpoint (0-400°C) [auto-saves]");
-    output->println("  ON              - Enable PID");
-    output->println("  OFF             - Disable PID");
-    output->println("  STATUS          - Get current status");
-    output->println("  KP:<value>      - Set Kp parameter [auto-saves]");
-    output->println("  KI:<value>      - Set Ki parameter [auto-saves]");
-    output->println("  KD:<value>      - Set Kd parameter [auto-saves]");
-    output->println("  MAXPOWER:<val>  - Set max power limit 0-100% [auto-saves]");
-    output->println("  POWER:<val>     - Manual power override 0-100%");
-    output->println("  RELEASE         - Release manual power control");
-    output->println("  TUNE            - Start PID auto-tune (requires setpoint)");
-    output->println("  OFFSET:<value> - Set temperature offset");
-    output->println("  HELP            - Show this help");
+  else if (strcmp(command, "HELP") == 0) {
+    output->println(F("Commands:"));
+    output->println(F("  SET:<temp>      - Set setpoint (0-400°C) [auto-saves]"));
+    output->println(F("  ON              - Enable PID"));
+    output->println(F("  OFF             - Disable PID"));
+    output->println(F("  STATUS          - Get current status"));
+    output->println(F("  KP:<value>      - Set Kp parameter [auto-saves]"));
+    output->println(F("  KI:<value>      - Set Ki parameter [auto-saves]"));
+    output->println(F("  KD:<value>      - Set Kd parameter [auto-saves]"));
+    output->println(F("  MAXPOWER:<val>  - Set max power limit 0-100% [auto-saves]"));
+    output->println(F("  POWER:<val>     - Manual power override 0-100%"));
+    output->println(F("  RELEASE         - Release manual power control"));
+    output->println(F("  TUNE            - Start PID auto-tune (requires setpoint)"));
+    output->println(F("  OFFSET:<value> - Set temperature offset"));
+    output->println(F("  HELP            - Show this help"));
   }
-  else if (command == "TUNE") {
+  else if (strcmp(command, "TUNE") == 0) {
     // Start auto-tune - will be handled in PID loop
     if (pid_setpoint > 30 && pid_setpoint < 400) {
       extern bool pid_autotune_active;
       pid_autotune_active = true;
       pid_enabled = true;
-      output->println("OK Auto-tune started. Wait 5-10 minutes...");
-      output->println("WARNING: Monitor temperature! Stop if unstable.");
+      output->println(F("OK Auto-tune started. Wait 5-10 minutes..."));
+      output->println(F("WARNING: Monitor temperature! Stop if unstable."));
 #if BT_ENABLED==1
       if (from_bt) {
-        Serial.println("BT: Auto-tune started");
+        Serial.println(F("BT: Auto-tune started"));
       }
 #endif
     } else {
-      output->println("ERROR Set valid setpoint first (30-400°C)");
+      output->println(F("ERROR Set valid setpoint first (30-400°C)"));
     }
   }
-  else if (command.startsWith("POWER:")) {
+  else if (strncmp(command, "POWER:", 6) == 0) {
     // Command: POWER:<value> (manual power control, for testing)
-    int value = command.substring(6).toInt();
+    int value = atoi(command + 6);
     if (value >= 0 && value <= 100) {
       hold_power = true;
       pid_current_power = (uint8_t)value;
-      output->print("OK Power set to ");
+      output->print(F("OK Power set to "));
       output->print(pid_current_power);
-      output->println("% (manual override)");
+      output->println(F("% (manual override)"));
     } else {
-      output->println("ERROR Invalid power range (0-100)");
+      output->println(F("ERROR Invalid power range (0-100)"));
     }
   }
-  else if (command == "RELEASE") {
+  else if (strcmp(command, "RELEASE") == 0) {
     // Command: POWER:RELEASE (release manual power control)
     hold_power = false;
-    output->println("OK Power control released to PID");
+    output->println(F("OK Power control released to PID"));
   }
-  else if (command.startsWith("MAXPOWER:")) {
+  else if (strncmp(command, "MAXPOWER:", 9) == 0) {
     // Command: MAXPOWER:<value> (set maximum power limit for PID)
-    int value = command.substring(9).toInt();
+    int value = atoi(command + 9);
     if (value < 0 || value > 100) {
-      output->println("ERROR Invalid max power range (0-100)");
+      output->println(F("ERROR Invalid max power range (0-100)"));
       return;
     } 
       max_power_limit = (uint8_t)value;
       pid_save_settings();
-      output->print("OK Max power limit set to ");
+      output->print(F("OK Max power limit set to "));
       output->print(max_power_limit);
-      output->println("% (saved)");
+      output->println(F("% (saved)"));
   } else {
-    output->println("ERROR Unknown command. Send HELP for commands.");
+    output->println(F("ERROR Unknown command. Send HELP for commands."));
   }
 }
 
 void bt_send_status(float temperature, uint8_t power, bool heater_on) {
 #if BT_ENABLED==1
   if (SerialBT != nullptr) {
-    SerialBT->print("TEMP:");
+    SerialBT->print(F("TEMP:"));
     SerialBT->print(temperature, 1);
-    SerialBT->print(" POWER:");
+    SerialBT->print(F(" POWER:"));
     SerialBT->print(power);
-    SerialBT->print(" HEAT:");
-    SerialBT->print(heater_on ? "ON" : "OFF");
-    SerialBT->print(" SP:");
+    SerialBT->print(F(" HEAT:"));
+    SerialBT->print(heater_on ? F("ON") : F("OFF"));
+    SerialBT->print(F(" SP:"));
     SerialBT->print(pid_setpoint);
-    SerialBT->print(" EN:");
+    SerialBT->print(F(" EN:"));
     SerialBT->println(pid_enabled);
   }
 #endif

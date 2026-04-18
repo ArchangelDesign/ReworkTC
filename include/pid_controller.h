@@ -74,15 +74,23 @@ uint8_t pid_current_power = 0; // 0% - 100%
 bool hold_power = false;
 uint8_t max_power_limit = 100; // Max power limit
 
-// PID parameters
+// PID parameters - use smaller precision on AVR to save RAM
+#ifdef __AVR__
+// On AVR, we can use smaller types to save memory
 float pid_kp = 10.0;
 float pid_ki = 0.5;
 float pid_kd = 50.0;
-
-// PID internal state
 float pid_integral = 0.0;
 float pid_last_error = 0.0;
-float pid_last_derivative = 0.0;  // For derivative filtering
+float pid_last_derivative = 0.0;
+#else
+float pid_kp = 10.0;
+float pid_ki = 0.5;
+float pid_kd = 50.0;
+float pid_integral = 0.0;
+float pid_last_error = 0.0;
+float pid_last_derivative = 0.0;
+#endif
 unsigned long pid_last_time = 0;
 
 // Auto-tune state
@@ -229,14 +237,16 @@ void pid_compute() {
       pid_autotune_peak_high = temp;
       pid_autotune_peak_low = temp;
       pid_autotune_relay_state = (temp < pid_setpoint);
-      Serial.print("Auto-tune: Starting relay test with ");
+      #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+      Serial.print(F("Auto-tune: Starting relay test with "));
       Serial.print(pid_autotune_output_step, 0);
-      Serial.println("% power");
-      Serial.print("Target: ");
+      Serial.println(F("% power"));
+      Serial.print(F("Target: "));
       Serial.print(pid_setpoint);
-      Serial.print("C, Current: ");
+      Serial.print(F("C, Current: "));
       Serial.print(temp);
-      Serial.println("C");
+      Serial.println(F("C"));
+      #endif
     }
     
     // Check if stuck heating without reaching setpoint
@@ -247,9 +257,11 @@ void pid_compute() {
           pid_autotune_output_step += 10.0;
           if (pid_autotune_output_step > 90.0) pid_autotune_output_step = 90.0;
           pid_autotune_stall_timer = now;
-          Serial.print("Auto-tune: Increasing power to ");
+          #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+          Serial.print(F("Auto-tune: Increasing power to "));
           Serial.print(pid_autotune_output_step, 0);
-          Serial.println("% (not reaching setpoint)");
+          Serial.println(F("% (not reaching setpoint)"));
+          #endif
         }
       }
     }
@@ -267,16 +279,18 @@ void pid_compute() {
       if (period > 10000 && pid_autotune_cycles > 0) {
         float amplitude = (pid_autotune_peak_high - pid_autotune_peak_low) / 2.0;
         
-        Serial.print("Auto-tune cycle ");
+        #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+        Serial.print(F("Auto-tune cycle "));
         Serial.print(pid_autotune_cycles);
-        Serial.print(": Period=");
+        Serial.print(F(": Period="));
         Serial.print(period / 1000.0);
-        Serial.print("s, Amplitude=");
+        Serial.print(F("s, Amplitude="));
         Serial.print(amplitude);
-        Serial.print("C, Peaks=");
+        Serial.print(F("C, Peaks="));
         Serial.print(pid_autotune_peak_low);
-        Serial.print("-");
+        Serial.print(F("-"));
         Serial.println(pid_autotune_peak_high);
+        #endif
         
         // Accumulate measurements
         pid_autotune_period_sum += period;
@@ -315,26 +329,30 @@ void pid_compute() {
           pid_autotune_amplitude_sum = 0;
           pid_integral = 0;
           
-          Serial.println("=======================================");
-          Serial.println("Auto-tune COMPLETE!");
-          Serial.print("Ku (ultimate gain) = ");
+          Serial.println(F("======================================="));
+          Serial.println(F("Auto-tune COMPLETE!"));
+          #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+          Serial.print(F("Ku (ultimate gain) = "));
           Serial.println(ku, 2);
-          Serial.print("Tu (ultimate period) = ");
+          Serial.print(F("Tu (ultimate period) = "));
           Serial.print(tu, 2);
-          Serial.println("s");
-          Serial.print("New PID values: Kp=");
+          Serial.println(F("s"));
+          #endif
+          Serial.print(F("New PID values: Kp="));
           Serial.print(pid_kp, 2);
-          Serial.print(" Ki=");
+          Serial.print(F(" Ki="));
           Serial.print(pid_ki, 2);
-          Serial.print(" Kd=");
+          Serial.print(F(" Kd="));
           Serial.println(pid_kd, 2);
-          Serial.println("Values saved to memory.");
-          Serial.println("=======================================");
+          Serial.println(F("Values saved to memory."));
+          Serial.println(F("======================================="));
         }
       } else if (pid_autotune_cycles == 0) {
         // First crossing, start counting
         pid_autotune_cycles = 1;
-        Serial.println("Auto-tune: First crossing detected, starting measurements...");
+        #ifndef __AVR__  // Disable verbose output on AVR to save RAM
+        Serial.println(F("Auto-tune: First crossing detected, starting measurements..."));
+        #endif
       }
       
       pid_autotune_last_crossing = now;
