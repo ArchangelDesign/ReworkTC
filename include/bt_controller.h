@@ -213,6 +213,13 @@ void bt_process_commands() {
       Serial.println(pid_kd, 2);
     }
 #endif
+}
+  else if (command.startsWith("OFFSET:")) {
+    int value = command.substring(7).toFloat();
+    offset_temperature = value;
+    output->print("OK offset=");
+    output->print(offset_temperature);
+    output->println(" (saved)");
   }
   else if (strcmp(command, "HELP") == 0) {
     output->println(F("Commands:"));
@@ -227,6 +234,7 @@ void bt_process_commands() {
     output->println(F("  POWER:<val>     - Manual power override 0-100%"));
     output->println(F("  RELEASE         - Release manual power control"));
     output->println(F("  TUNE            - Start PID auto-tune (requires setpoint)"));
+    output->println(F("  OFFSET:<value> - Set temperature offset"));
     output->println(F("  HELP            - Show this help"));
   }
   else if (strcmp(command, "TUNE") == 0) {

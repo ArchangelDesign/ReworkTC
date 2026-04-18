@@ -26,14 +26,26 @@
 #define REWORKTC_VERSION "1.3.2" 
 
 #include <Arduino.h>
+#include <Wire.h>
 
 #include "display.h"
 #include "thermocouple.h"
 #include "pid_controller.h"
 #include "bt_controller.h"
+#include "I2C_Anything.h"
 
+
+#if TOUCH_DISPLAY == 1
+#include "touch_interface.h"
+#endif
 
 void setup() {
+   #if TOUCH_DISPLAY == 1
+    #ifndef WIRE_BEGIN_CALLED
+      #define WIRE_BEGIN_CALLED
+        Wire.begin();
+    #endif
+  #endif
 #ifdef __AVR__
   // Arduino Nano/Uno - use lower baud rate for stability
   // CH340 chip on Nano doesn't support Serial readiness check properly
@@ -116,4 +128,9 @@ void loop() {
   pid_compute();  // Compute PID output
   pid_update_ssr();  // Update SSR state based on time-proportional control
   delay(250);  // Give MAX6675 time to convert
+
+   #if TOUCH_DISPLAY==1
+    send_i2c_Status();
+    check_i2c_updates();
+  #endif
 }

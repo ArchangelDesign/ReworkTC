@@ -117,6 +117,7 @@ void pid_save_settings() {
   pid_prefs.putFloat("kd", pid_kd);
   pid_prefs.putShort("setpoint", pid_setpoint);
   pid_prefs.putUChar("maxpower", max_power_limit);
+  pid_prefs.putInt("offset", offset_temperature);
   pid_prefs.end();
 #else
   // AVR EEPROM implementation
@@ -125,6 +126,7 @@ void pid_save_settings() {
   EEPROM.put(EEPROM_KD_ADDR, pid_kd);
   EEPROM.put(EEPROM_SETPOINT_ADDR, pid_setpoint);
   EEPROM.write(EEPROM_MAX_POWER_ADDR, max_power_limit);
+  EEPROM.put(EEPROM_OFFSET_ADDR, offset_temperature);
   EEPROM.write(EEPROM_MAGIC_ADDR, EEPROM_MAGIC_VALUE);
 #endif
 }
@@ -137,6 +139,7 @@ void pid_load_settings() {
   pid_kd = pid_prefs.getFloat("kd", 50.0);
   pid_setpoint = pid_prefs.getShort("setpoint", 25);
   max_power_limit = pid_prefs.getUChar("maxpower", 100);
+  offset_temperature = pid_prefs.getInt("offset", 0);
   pid_prefs.end();
 #else
   // AVR EEPROM implementation - check if initialized
@@ -145,8 +148,9 @@ void pid_load_settings() {
     EEPROM.get(EEPROM_KI_ADDR, pid_ki);
     EEPROM.get(EEPROM_KD_ADDR, pid_kd);
     EEPROM.get(EEPROM_SETPOINT_ADDR, pid_setpoint);
+    EEPROM.get(EEPROM_OFFSET_ADDR, offset_temperature);
     max_power_limit = EEPROM.read(EEPROM_MAX_POWER_ADDR);
-    if (max_power_limit > 100) max_power_limit = 0;
+    if (max_power_limit == 0 || max_power_limit > 100) max_power_limit = 100;
   } else {
     // EEPROM not initialized, use defaults
     pid_kp = 1.0;
@@ -154,6 +158,7 @@ void pid_load_settings() {
     pid_kd = 50;
     pid_setpoint = 37;
     max_power_limit = 100;
+    offset_temperature = 0;
   }
 #endif
 }
